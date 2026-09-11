@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   return NextResponse.json({
-    openapi: "3.0.3",
+    openapi: "3.1.0",
     info: {
       title: "VAELONS Etsy Manager Action API",
-      version: "1.0.1",
+      version: "1.0.2",
       description:
         "Lists VAELONS Etsy draft listings and schedules one or more drafts for future publication. This API does not edit listing title, SEO, tags, description, price, images, stock, shipping, or variations.",
     },
