@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-function defaultLocalDateTime() {
-  const date = new Date(Date.now() + 60 * 60 * 1000);
+function defaultLocalDateTime(offsetMinutes = 60) {
+  const date = new Date(Date.now() + offsetMinutes * 60 * 1000);
   date.setSeconds(0, 0);
   const pad = (n) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -12,25 +12,19 @@ function defaultLocalDateTime() {
 export default function Home() {
   const [connected, setConnected] = useState(null);
   const [drafts, setDrafts] = useState([]);
-  const [listingId, setListingId] = useState("");
-  const [publishAt, setPublishAt] = useState(defaultLocalDateTime);
+  const [scheduleTimes, setScheduleTimes] = useState({});
   const [loading, setLoading] = useState(true);
-  const [scheduling, setScheduling] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [schedulingId, setSchedulingId] = useState("");
+  const [messages, setMessages] = useState({});
+  const [errors, setErrors] = useState({});
 
   const timezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Yerel saat",
     []
   );
 
-  const selectedDraft = drafts.find(
-    (listing) => String(listing.listing_id) === String(listingId)
-  );
-
   async function loadDrafts() {
     setLoading(true);
-    setError("");
     try {
       const response = await fetch("/api/etsy/drafts", { cache: "no-store" });
       const data = await response.json();
@@ -39,13 +33,20 @@ export default function Home() {
         setDrafts([]);
         return;
       }
+
+      const listings = data.listings || [];
       setConnected(true);
-      setDrafts(data.listings || []);
-      if (!listingId && data.listings?.length) {
-        setListingId(String(data.listings[0].listing_id));
-      }
+      setDrafts(listings);
+      setScheduleTimes((current) => {
+        const next = { ...current };
+        listings.forEach((listing, index) => {
+          const id = String(listing.listing_id);
+          if (!next[id]) next[id] = defaultLocalDateTime(60 + index * 15);
+        });
+        return next;
+      });
     } catch {
-      setError("Manager Etsy taslaklarını yükleyemedi.");
+      setErrors({ general: "Manager Etsy taslaklarını yükleyemedi." });
     } finally {
       setLoading(false);
     }
@@ -55,32 +56,48 @@ export default function Home() {
     loadDrafts();
   }, []);
 
-  async function schedulePublish(event) {
-    event.preventDefault();
-    setScheduling(true);
-    setMessage("");
-    setError("");
+  function setListingTime(listingId, value) {
+    const id = String(listingId);
+    setScheduleTimes((current) => ({ ...current, [id]: value }));
+    setMessages((current) => ({ ...current, [id]: "" }));
+    setErrors((current) => ({ ...current, [id]: "" }));
+  }
+
+  async function scheduleListing(listing) {
+    const id = String(listing.listing_id);
+    const localValue = scheduleTimes[id];
+
+    setSchedulingId(id);
+    setMessages((current) => ({ ...current, [id]: "" }));
+    setErrors((current) => ({ ...current, [id]: "" }));
 
     try {
-      const publishDate = new Date(publishAt);
+      if (!localValue) throw new Error("Önce yayınlama tarihi ve saati seç.");
+      const publishDate = new Date(localValue);
+      if (Number.isNaN(publishDate.getTime())) throw new Error("Geçerli bir tarih ve saat seç.");
+
       const response = await fetch("/api/etsy/schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          listingId,
+          listingId: id,
           publishAt: publishDate.toISOString(),
         }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Planlama başarısız.");
 
-      setMessage(
-        `Planlandı. Listing #${data.listingId}, ${publishDate.toLocaleString("tr-TR")} tarihinde otomatik yayınlanacak.`
-      );
+      setMessages((current) => ({
+        ...current,
+        [id]: `Planlandı: ${publishDate.toLocaleString("tr-TR")} tarihinde otomatik yayınlanacak.`,
+      }));
     } catch (err) {
-      setError(err.message || "Planlama başarısız.");
+      setErrors((current) => ({
+        ...current,
+        [id]: err.message || "Planlama başarısız.",
+      }));
     } finally {
-      setScheduling(false);
+      setSchedulingId("");
     }
   }
 
@@ -103,7 +120,7 @@ export default function Home() {
     },
     button: {
       width: "100%",
-      padding: "13px 18px",
+      padding: "12px 16px",
       background: "#111827",
       color: "#fff",
       border: 0,
@@ -115,12 +132,12 @@ export default function Home() {
   };
 
   return (
-    <main style={{ maxWidth: 760, margin: "48px auto", padding: "0 20px 60px", fontFamily: "Arial, sans-serif" }}>
+    <main style={{ maxWidth: 820, margin: "48px auto", padding: "0 20px 60px", fontFamily: "Arial, sans-serif" }}>
       <div style={{ marginBottom: 26 }}>
         <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1.4, color: "#8a6b20" }}>VAELONS</div>
         <h1 style={{ margin: "8px 0", fontSize: 34 }}>Etsy Manager</h1>
         <p style={{ margin: 0, color: "#6b7280", lineHeight: 1.6 }}>
-          Taslak ürününü seç, tarih ve saati belirle. Manager zamanı geldiğinde Etsy’de otomatik yayınlar.
+          Her taslak ürün için ayrı yayınlama tarihi ve saati belirle. Manager zamanı geldiğinde Etsy’de otomatik yayınlar.
         </p>
       </div>
 
@@ -138,7 +155,7 @@ export default function Home() {
             </a>
           </div>
         ) : (
-          <form onSubmit={schedulePublish}>
+          <div>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 20 }}>
               <div>
                 <strong style={{ color: "#166534" }}>● Etsy bağlı</strong>
@@ -154,60 +171,71 @@ export default function Home() {
                 Etsy’de yayınlanmayı bekleyen taslak ürün bulunamadı.
               </div>
             ) : (
-              <>
-                <label style={{ display: "block", fontWeight: 700, marginBottom: 8 }}>Taslak ürün — sadece 1 ürün seç</label>
-                <div style={{ display: "grid", gap: 10, marginBottom: 12 }}>
-                  {drafts.map((listing) => {
-                    const selected = String(listingId) === String(listing.listing_id);
-                    return (
+              <div style={{ display: "grid", gap: 14 }}>
+                {drafts.map((listing) => {
+                  const id = String(listing.listing_id);
+                  const busy = schedulingId === id;
+                  return (
+                    <div
+                      key={id}
+                      style={{
+                        border: "1px solid #d1d5db",
+                        borderRadius: 14,
+                        padding: 16,
+                        background: "#fff",
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, lineHeight: 1.45, marginBottom: 4 }}>{listing.title}</div>
+                      <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 14 }}>Listing #{id}</div>
+
+                      <label htmlFor={`publish-${id}`} style={{ display: "block", fontWeight: 700, fontSize: 13, marginBottom: 7 }}>
+                        Bu ürünün yayınlama tarihi ve saati
+                      </label>
+                      <input
+                        id={`publish-${id}`}
+                        type="datetime-local"
+                        value={scheduleTimes[id] || ""}
+                        onChange={(e) => setListingTime(id, e.target.value)}
+                        style={{ ...styles.input, marginBottom: 7 }}
+                      />
+                      <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>Saat dilimi: {timezone}</div>
+
                       <button
-                        key={listing.listing_id}
                         type="button"
-                        onClick={() => setListingId(String(listing.listing_id))}
-                        aria-pressed={selected}
-                        style={{
-                          width: "100%",
-                          textAlign: "left",
-                          padding: "13px 14px",
-                          borderRadius: 10,
-                          border: selected ? "2px solid #111827" : "1px solid #d1d5db",
-                          background: selected ? "#f3f4f6" : "#fff",
-                          cursor: "pointer",
-                        }}
+                        onClick={() => scheduleListing(listing)}
+                        disabled={busy}
+                        style={{ ...styles.button, opacity: busy ? 0.6 : 1 }}
                       >
-                        <div style={{ fontWeight: 700, lineHeight: 1.4 }}>{listing.title}</div>
-                        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-                          #{listing.listing_id} {selected ? "• SEÇİLDİ" : ""}
-                        </div>
+                        {busy ? "Planlanıyor…" : "Bu Ürünü Planla"}
                       </button>
-                    );
-                  })}
-                </div>
 
-                {selectedDraft && (
-                  <div style={{ marginBottom: 18, padding: "10px 12px", borderRadius: 9, background: "#ecfdf5", color: "#166534", fontSize: 13, lineHeight: 1.5 }}>
-                    <strong>Seçili ürün:</strong> {selectedDraft.title}
-                  </div>
-                )}
-
-                <label style={{ display: "block", fontWeight: 700, marginBottom: 8 }}>Yayınlama tarihi ve saati</label>
-                <input type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} required style={styles.input} />
-                <div style={{ fontSize: 12, color: "#6b7280", margin: "7px 0 20px" }}>Saat dilimi: {timezone}</div>
-
-                <button type="submit" disabled={scheduling || !listingId} style={{ ...styles.button, opacity: scheduling || !listingId ? 0.6 : 1 }}>
-                  {scheduling ? "Planlanıyor…" : "Planlı Yayınla"}
-                </button>
-              </>
+                      {messages[id] && (
+                        <div style={{ marginTop: 12, padding: 11, borderRadius: 9, background: "#ecfdf5", color: "#166534", fontSize: 13, lineHeight: 1.5 }}>
+                          {messages[id]}
+                        </div>
+                      )}
+                      {errors[id] && (
+                        <div style={{ marginTop: 12, padding: 11, borderRadius: 9, background: "#fef2f2", color: "#991b1b", fontSize: 13, lineHeight: 1.5 }}>
+                          {errors[id]}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
-          </form>
+          </div>
         )}
 
-        {message && <div style={{ marginTop: 18, padding: 14, borderRadius: 10, background: "#ecfdf5", color: "#166534", lineHeight: 1.5 }}>{message}</div>}
-        {error && <div style={{ marginTop: 18, padding: 14, borderRadius: 10, background: "#fef2f2", color: "#991b1b", lineHeight: 1.5 }}>{error}</div>}
+        {errors.general && (
+          <div style={{ marginTop: 18, padding: 14, borderRadius: 10, background: "#fef2f2", color: "#991b1b", lineHeight: 1.5 }}>
+            {errors.general}
+          </div>
+        )}
       </section>
 
       <p style={{ textAlign: "center", color: "#9ca3af", fontSize: 12, marginTop: 18 }}>
-        Planlanan ürünler Manager kapalı olsa bile Vercel Workflow üzerinden yayınlanır.
+        Her ürün bağımsız planlanır. Manager kapalı olsa bile Vercel Workflow zamanı geldiğinde ürünü yayınlar.
       </p>
     </main>
   );
