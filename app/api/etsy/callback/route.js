@@ -60,23 +60,50 @@ export async function GET(request) {
       {
         headers: {
           "x-api-key": apiKey,
-          Authorization: `Bearer ${data.access_token}`,
         },
         cache: "no-store",
       }
     );
     const shop = await shopResponse.json();
-    const expected = (process.env.ETSY_EXPECTED_SHOP_NAME || "VAELONS").trim().toLowerCase();
-    const actual = String(shop?.shop_name || "").trim().toLowerCase();
 
-    if (!shopResponse.ok || !shop?.shop_id || actual !== expected) {
+    if (!shopResponse.ok) {
       return NextResponse.json(
-        { error: "Bu Etsy hesabı VAELONS mağazasına bağlı değil." },
+        {
+          error: "Etsy mağazası doğrulanamadı.",
+          details: shop,
+          status: shopResponse.status,
+        },
+        { status: shopResponse.status }
+      );
+    }
+
+    if (!shop?.shop_id || String(shop?.user_id) !== String(userId)) {
+      return NextResponse.json(
+        {
+          error: "Yetkilendirilen Etsy hesabına ait mağaza doğrulanamadı.",
+          shop_name: shop?.shop_name || null,
+        },
         { status: 403 }
       );
     }
 
-    const response = NextResponse.redirect(new URL("/?etsy=connected", request.url));
+    const expectedShopName = process.env.ETSY_EXPECTED_SHOP_NAME?.trim().toLowerCase();
+    if (
+      expectedShopName &&
+      String(shop.shop_name || "").trim().toLowerCase() !== expectedShopName
+    ) {
+      return NextResponse.json(
+        {
+          error: "Yetkilendirilen mağaza adı Manager ayarıyla eşleşmiyor.",
+          shop_name: shop.shop_name,
+        },
+        { status: 403 }
+      );
+    }
+
+    const response = NextResponse.redirect(
+      "https://etsy-price-manager.vercel.app/?etsy=connected"
+    );
     response.cookies.set("etsy_refresh_token", data.refresh_token, {
       httpOnly: true,
       secure: true,
