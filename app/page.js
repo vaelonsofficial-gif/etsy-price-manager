@@ -17,6 +17,10 @@ export default function Home() {
   const [schedulingId, setSchedulingId] = useState("");
   const [messages, setMessages] = useState({});
   const [errors, setErrors] = useState({});
+  const [gptKey, setGptKey] = useState("");
+  const [gptLoading, setGptLoading] = useState(false);
+  const [gptError, setGptError] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const timezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Yerel saat",
@@ -98,6 +102,32 @@ export default function Home() {
       }));
     } finally {
       setSchedulingId("");
+    }
+  }
+
+  async function generateGptKey() {
+    setGptLoading(true);
+    setGptError("");
+    setCopied(false);
+    try {
+      const response = await fetch("/api/gpt/token", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "GPT Action anahtarı üretilemedi.");
+      setGptKey(data.apiKey || "");
+    } catch (err) {
+      setGptError(err.message || "GPT Action anahtarı üretilemedi.");
+    } finally {
+      setGptLoading(false);
+    }
+  }
+
+  async function copyGptKey() {
+    if (!gptKey) return;
+    try {
+      await navigator.clipboard.writeText(gptKey);
+      setCopied(true);
+    } catch {
+      setGptError("Anahtar otomatik kopyalanamadı. Metin alanından manuel kopyala.");
     }
   }
 
@@ -233,6 +263,56 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      {connected && (
+        <section style={{ ...styles.card, marginTop: 18 }}>
+          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 22 }}>GPT İçinden Kullanım</h2>
+          <p style={{ color: "#6b7280", lineHeight: 1.6, marginTop: 0 }}>
+            VAELONS Etsy Manager GPT’nin taslakları görmesi ve ürünleri farklı saatlere planlaması için güvenli bir Action anahtarı oluştur.
+          </p>
+
+          <button
+            type="button"
+            onClick={generateGptKey}
+            disabled={gptLoading}
+            style={{ ...styles.button, opacity: gptLoading ? 0.6 : 1 }}
+          >
+            {gptLoading ? "Anahtar oluşturuluyor…" : "GPT Action Anahtarı Oluştur"}
+          </button>
+
+          {gptKey && (
+            <div style={{ marginTop: 16 }}>
+              <label style={{ display: "block", fontWeight: 700, marginBottom: 7 }}>GPT Action API Key</label>
+              <textarea
+                readOnly
+                value={gptKey}
+                rows={4}
+                style={{ ...styles.input, resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
+              />
+              <button
+                type="button"
+                onClick={copyGptKey}
+                style={{ ...styles.button, marginTop: 10, background: copied ? "#166534" : "#374151" }}
+              >
+                {copied ? "Kopyalandı" : "Anahtarı Kopyala"}
+              </button>
+              <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: "#fffbeb", color: "#92400e", fontSize: 13, lineHeight: 1.55 }}>
+                Bu anahtarı normal sohbete gönderme. Yalnızca GPT Builder → Actions → Authentication alanındaki gizli API key bölümüne yapıştır.
+              </div>
+              <div style={{ marginTop: 12, fontSize: 13, color: "#4b5563", lineHeight: 1.6 }}>
+                <strong>OpenAPI Schema URL:</strong><br />
+                https://etsy-price-manager.vercel.app/api/gpt/openapi
+              </div>
+            </div>
+          )}
+
+          {gptError && (
+            <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: "#fef2f2", color: "#991b1b", lineHeight: 1.5 }}>
+              {gptError}
+            </div>
+          )}
+        </section>
+      )}
 
       <p style={{ textAlign: "center", color: "#9ca3af", fontSize: 12, marginTop: 18 }}>
         Her ürün bağımsız planlanır. Manager kapalı olsa bile Vercel Workflow zamanı geldiğinde ürünü yayınlar.
