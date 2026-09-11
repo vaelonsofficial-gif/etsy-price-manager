@@ -24,6 +24,10 @@ export default function Home() {
     []
   );
 
+  const selectedDraft = drafts.find(
+    (listing) => String(listing.listing_id) === String(listingId)
+  );
+
   async function loadDrafts() {
     setLoading(true);
     setError("");
@@ -151,20 +155,46 @@ export default function Home() {
               </div>
             ) : (
               <>
-                <label style={{ display: "block", fontWeight: 700, marginBottom: 8 }}>Taslak ürün</label>
-                <select value={listingId} onChange={(e) => setListingId(e.target.value)} style={{ ...styles.input, marginBottom: 18 }}>
-                  {drafts.map((listing) => (
-                    <option key={listing.listing_id} value={listing.listing_id}>
-                      {listing.title} — #{listing.listing_id}
-                    </option>
-                  ))}
-                </select>
+                <label style={{ display: "block", fontWeight: 700, marginBottom: 8 }}>Taslak ürün — sadece 1 ürün seç</label>
+                <div style={{ display: "grid", gap: 10, marginBottom: 12 }}>
+                  {drafts.map((listing) => {
+                    const selected = String(listingId) === String(listing.listing_id);
+                    return (
+                      <button
+                        key={listing.listing_id}
+                        type="button"
+                        onClick={() => setListingId(String(listing.listing_id))}
+                        aria-pressed={selected}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "13px 14px",
+                          borderRadius: 10,
+                          border: selected ? "2px solid #111827" : "1px solid #d1d5db",
+                          background: selected ? "#f3f4f6" : "#fff",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, lineHeight: 1.4 }}>{listing.title}</div>
+                        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                          #{listing.listing_id} {selected ? "• SEÇİLDİ" : ""}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {selectedDraft && (
+                  <div style={{ marginBottom: 18, padding: "10px 12px", borderRadius: 9, background: "#ecfdf5", color: "#166534", fontSize: 13, lineHeight: 1.5 }}>
+                    <strong>Seçili ürün:</strong> {selectedDraft.title}
+                  </div>
+                )}
 
                 <label style={{ display: "block", fontWeight: 700, marginBottom: 8 }}>Yayınlama tarihi ve saati</label>
                 <input type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} required style={styles.input} />
                 <div style={{ fontSize: 12, color: "#6b7280", margin: "7px 0 20px" }}>Saat dilimi: {timezone}</div>
 
-                <button type="submit" disabled={scheduling} style={{ ...styles.button, opacity: scheduling ? 0.6 : 1 }}>
+                <button type="submit" disabled={scheduling || !listingId} style={{ ...styles.button, opacity: scheduling || !listingId ? 0.6 : 1 }}>
                   {scheduling ? "Planlanıyor…" : "Planlı Yayınla"}
                 </button>
               </>
