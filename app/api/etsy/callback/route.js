@@ -60,6 +60,7 @@ export async function GET(request) {
       {
         headers: {
           "x-api-key": apiKey,
+          Authorization: `Bearer ${data.access_token}`,
         },
         cache: "no-store",
       }
