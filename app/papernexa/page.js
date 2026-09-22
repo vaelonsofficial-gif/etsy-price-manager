@@ -3,15 +3,14 @@
 import { useEffect, useState } from "react";
 
 export default function PaperNexaPage() {
-  const [status, setStatus] = useState({ configured: null, connected: null });
-  const [apiKey, setApiKey] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState({ connected: null });
   const [packageFile, setPackageFile] = useState(null);
   const [price, setPrice] = useState("8.99");
-  const [query, setQuery] = useState("planner");
+  const [query, setQuery] = useState("wedding planner");
   const [categories, setCategories] = useState([]);
   const [taxonomyId, setTaxonomyId] = useState("");
   const [busy, setBusy] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -21,7 +20,26 @@ export default function PaperNexaPage() {
       const data = await r.json();
       setStatus(data);
     } catch {
-      setStatus({ configured: false, connected: false });
+      setStatus({ connected: false, error: "Bağlantı kontrolü yapılamadı." });
+    }
+  }
+
+  async function searchCategory(q = query) {
+    setSearching(true);
+    setError("");
+    try {
+      const r = await fetch("/api/papernexa/taxonomy?q=" + encodeURIComponent(q), {
+        cache: "no-store",
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Kategori araması başarısız.");
+      const results = data.results || [];
+      setCategories(results);
+      if (results.length === 1) setTaxonomyId(String(results[0].taxonomy_id));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSearching(false);
     }
   }
 
@@ -29,49 +47,19 @@ export default function PaperNexaPage() {
     loadStatus();
   }, []);
 
-  async function saveAndConnect() {
-    setSaving(true);
-    setError("");
-    try {
-      const r = await fetch("/api/papernexa/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || "API anahtarı kaydedilemedi.");
-      window.location.href = "/api/papernexa/login";
-    } catch (e) {
-      setError(e.message);
-      setSaving(false);
-    }
-  }
-
-  async function searchCategory() {
-    setError("");
-    const r = await fetch("/api/papernexa/taxonomy?q=" + encodeURIComponent(query), {
-      cache: "no-store",
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      setError(data.error || "Kategori araması başarısız.");
-      return;
-    }
-    setCategories(data.results || []);
-    if ((data.results || []).length === 1) {
-      setTaxonomyId(String(data.results[0].taxonomy_id));
-    }
-  }
+  useEffect(() => {
+    if (status.connected && categories.length === 0) searchCategory("wedding planner");
+  }, [status.connected]);
 
   async function submit(activate) {
     setBusy(true);
     setError("");
     setMessage("");
     try {
-      if (!packageFile) throw new Error("Full seller package ZIP seç.");
-      if (!taxonomyId) throw new Error("Önce Etsy kategorisini seç.");
+      if (!packageFile) throw new Error("Yayın paketini seç.");
+      if (!taxonomyId) throw new Error("Etsy kategorisini seç.");
       if (packageFile.size > 4.2 * 1024 * 1024) {
-        throw new Error("Full seller ZIP 4.2 MB altında olmalı.");
+        throw new Error("Paket 4.2 MB sınırını aşıyor.");
       }
 
       const form = new FormData();
@@ -80,22 +68,17 @@ export default function PaperNexaPage() {
       form.append("taxonomyId", taxonomyId);
       form.append("activate", activate ? "true" : "false");
 
-      const r = await fetch("/api/papernexa/publish", {
-        method: "POST",
-        body: form,
-      });
+      const r = await fetch("/api/papernexa/publish", { method: "POST", body: form });
       const data = await r.json();
       if (!r.ok) {
-        const details = data?.details?.listing_id
-          ? ` Etsy taslak ID: ${data.details.listing_id}`
-          : "";
-        throw new Error((data.error || "İşlem başarısız.") + details);
+        const listing = data?.details?.listing_id ? ` • Etsy taslak #${data.details.listing_id}` : "";
+        throw new Error((data.error || "İşlem başarısız.") + listing);
       }
 
       setMessage(
         activate
-          ? `Yayınlandı. Listing #${data.listing_id} • ${data.thumbnail_count} thumbnail • ${data.tag_count} tag`
-          : `Taslak oluşturuldu. Listing #${data.listing_id} • dosyalar yüklendi.`
+          ? `YAYINLANDI • Listing #${data.listing_id} • ${data.thumbnail_count} görsel • ${data.tag_count} tag`
+          : `TASLAK HAZIR • Listing #${data.listing_id} • tüm dosyalar yüklendi`
       );
     } catch (e) {
       setError(e.message || "İşlem başarısız.");
@@ -106,101 +89,84 @@ export default function PaperNexaPage() {
 
   const card = {
     background: "#fff",
-    border: "1px solid #e7e1d8",
-    borderRadius: 18,
+    border: "1px solid #e4dbcf",
+    borderRadius: 20,
     padding: 24,
-    boxShadow: "0 12px 36px rgba(58,47,38,.06)",
+    boxShadow: "0 16px 50px rgba(58,47,38,.07)",
   };
   const input = {
     width: "100%",
     boxSizing: "border-box",
-    padding: "12px 14px",
-    border: "1px solid #d8d0c6",
-    borderRadius: 10,
+    padding: "13px 14px",
+    border: "1px solid #d8cec2",
+    borderRadius: 11,
     fontSize: 15,
     background: "#fff",
+    color: "#3e352f",
   };
-  const primary = {
-    padding: "12px 16px",
+  const button = {
+    padding: "14px 16px",
     border: 0,
-    borderRadius: 10,
+    borderRadius: 11,
     fontWeight: 800,
     cursor: "pointer",
     background: "#3e352f",
     color: "#fff",
+    fontSize: 15,
   };
 
   return (
-    <main style={{ minHeight: "100vh", background: "#f8f4ee", padding: "44px 20px 70px", fontFamily: "Arial, sans-serif", color: "#3e352f" }}>
-      <div style={{ maxWidth: 900, margin: "0 auto" }}>
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 13, letterSpacing: 1.5, fontWeight: 800, color: "#a08368" }}>PAPERNEXA</div>
-          <h1 style={{ fontSize: 36, margin: "8px 0 6px" }}>Etsy Full Set Publisher</h1>
-          <p style={{ color: "#776d64", lineHeight: 1.6, margin: 0 }}>
-            PaperNexa full seller ZIP'ini seç. Manager SEO dosyasını, 10 thumbnail'i ve müşteri ZIP'ini otomatik okuyup Etsy listingine yükler.
+    <main style={{ minHeight: "100vh", background: "#f7f2eb", padding: "42px 18px 70px", fontFamily: "Arial, sans-serif", color: "#3e352f" }}>
+      <div style={{ maxWidth: 880, margin: "0 auto" }}>
+        <div style={{ marginBottom: 22 }}>
+          <div style={{ fontSize: 13, letterSpacing: 2, fontWeight: 900, color: "#a08368" }}>PAPERNEXA</div>
+          <h1 style={{ fontSize: 38, margin: "8px 0 6px" }}>Etsy Publisher</h1>
+          <p style={{ margin: 0, color: "#776d64", lineHeight: 1.6 }}>
+            Mevcut PaperNexa Etsy bağlantısını kullanır. Yeniden API anahtarı veya Developer kurulumu istemez.
           </p>
         </div>
 
         <section style={card}>
-          {status.configured === null ? (
-            <p>Bağlantı kontrol ediliyor…</p>
-          ) : !status.configured ? (
-            <>
-              <h2 style={{ marginTop: 0 }}>1. PaperNexa Etsy API'yi bağla</h2>
-              <p style={{ color: "#776d64", lineHeight: 1.6 }}>
-                PaperNexa Etsy Developer uygulamasındaki <strong>keystring:shared_secret</strong> değerini bir kez gir. Anahtar tarayıcıya açık biçimde geri gösterilmez; güvenli HttpOnly cookie içinde şifreli tutulur.
-              </p>
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="keystring:shared_secret"
-                style={input}
-              />
-              <button onClick={saveAndConnect} disabled={saving} style={{ ...primary, width: "100%", marginTop: 12, opacity: saving ? .6 : 1 }}>
-                {saving ? "Kaydediliyor…" : "Kaydet ve PaperNexa Etsy'yi Bağla"}
-              </button>
-              <p style={{ fontSize: 12, color: "#8b8178", lineHeight: 1.5 }}>
-                Etsy Developer uygulamasında izin verilen redirect URL: https://etsy-price-manager.vercel.app/api/etsy/callback
-              </p>
-            </>
-          ) : !status.connected ? (
-            <>
-              <h2 style={{ marginTop: 0 }}>2. Etsy yetkilendirmesi gerekli</h2>
-              <p style={{ color: "#776d64" }}>API anahtarı kayıtlı. Şimdi PaperNexa Etsy hesabına izin ver.</p>
-              <a href="/api/papernexa/login" style={{ ...primary, display: "block", textDecoration: "none", textAlign: "center" }}>
-                PaperNexa Etsy Hesabını Bağla
-              </a>
-            </>
-          ) : (
-            <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <div>
-                  <strong style={{ color: "#26734d" }}>● Etsy bağlı</strong>
-                  <div style={{ color: "#776d64", fontSize: 13, marginTop: 4 }}>
-                    {status.shop?.shop_name || "PaperNexa"} • Shop #{status.shop?.shop_id}
-                  </div>
+          {status.connected === null ? (
+            <strong>Mevcut Etsy bağlantısı kontrol ediliyor…</strong>
+          ) : status.connected ? (
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+              <div>
+                <div style={{ color: "#24734d", fontWeight: 900, fontSize: 17 }}>● PaperNexa Etsy bağlı</div>
+                <div style={{ color: "#776d64", marginTop: 6 }}>
+                  {status.shop?.shop_name} • Shop #{status.shop?.shop_id}
                 </div>
-                <button onClick={loadStatus} style={{ ...primary, background: "#7e7268" }}>Bağlantıyı Yenile</button>
+                <div style={{ color: "#9b8e81", fontSize: 12, marginTop: 4 }}>
+                  Mevcut bağlantı kullanılıyor.
+                </div>
               </div>
-            </>
+              <button onClick={loadStatus} style={{ ...button, background: "#847467" }}>Kontrol Et</button>
+            </div>
+          ) : (
+            <div>
+              <div style={{ color: "#9a3030", fontWeight: 900 }}>Bu tarayıcıdaki eski Etsy oturumu bulunamadı.</div>
+              <p style={{ color: "#776d64", lineHeight: 1.6 }}>
+                Yeni key veya secret istemiyorum. Önce aynı tarayıcıda mevcut Etsy oturumunu yeniden algılamayı dene.
+              </p>
+              <button onClick={loadStatus} style={button}>Mevcut Bağlantıyı Tekrar Kontrol Et</button>
+              {status.error && <div style={{ fontSize: 12, color: "#9a3030", marginTop: 10 }}>{status.error}</div>}
+            </div>
           )}
         </section>
 
         {status.connected && (
           <>
             <section style={{ ...card, marginTop: 18 }}>
-              <h2 style={{ marginTop: 0 }}>Etsy kategorisini seç</h2>
-              <p style={{ color: "#776d64", lineHeight: 1.5 }}>
-                Planner ürünlerinde “planner”, Frame TV ürünlerinde “digital art” gibi arama yap. Seçilen gerçek Etsy taxonomy ID yayın sırasında kullanılır.
-              </p>
+              <h2 style={{ marginTop: 0 }}>1. Etsy kategorisi</h2>
               <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}>
                 <input value={query} onChange={(e) => setQuery(e.target.value)} style={input} />
-                <button onClick={searchCategory} style={primary}>Kategori Ara</button>
+                <button onClick={() => searchCategory(query)} disabled={searching} style={button}>
+                  {searching ? "Aranıyor…" : "Kategori Ara"}
+                </button>
               </div>
               {categories.length > 0 && (
                 <select value={taxonomyId} onChange={(e) => setTaxonomyId(e.target.value)} style={{ ...input, marginTop: 12 }}>
-                  <option value="">Kategori seç…</option>
+                  <option value="">Uygun kategoriyi seç…</option>
                   {categories.map((x) => (
                     <option key={x.taxonomy_id} value={x.taxonomy_id}>
                       {x.path} — #{x.taxonomy_id}
@@ -211,38 +177,32 @@ export default function PaperNexaPage() {
             </section>
 
             <section style={{ ...card, marginTop: 18 }}>
-              <h2 style={{ marginTop: 0 }}>Full set yükle</h2>
+              <h2 style={{ marginTop: 0 }}>2. Hazır full set</h2>
+              <p style={{ color: "#776d64", lineHeight: 1.55 }}>
+                ZIP içinden başlık, açıklama, 13 tag, thumbnail'ler ve müşteri indirme dosyası otomatik alınır.
+              </p>
               <div style={{ display: "grid", gap: 14 }}>
+                <input
+                  type="file"
+                  accept=".zip,application/zip"
+                  onChange={(e) => setPackageFile(e.target.files?.[0] || null)}
+                  style={input}
+                />
+                {packageFile && (
+                  <div style={{ fontSize: 12, color: "#776d64" }}>
+                    {packageFile.name} • {(packageFile.size / 1024 / 1024).toFixed(2)} MB
+                  </div>
+                )}
                 <div>
-                  <label style={{ display: "block", fontWeight: 800, marginBottom: 7 }}>Full Seller Package ZIP</label>
-                  <input
-                    type="file"
-                    accept=".zip,application/zip"
-                    onChange={(e) => setPackageFile(e.target.files?.[0] || null)}
-                    style={input}
-                  />
-                  {packageFile && (
-                    <div style={{ fontSize: 12, color: "#776d64", marginTop: 6 }}>
-                      {packageFile.name} • {(packageFile.size / 1024 / 1024).toFixed(2)} MB
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label style={{ display: "block", fontWeight: 800, marginBottom: 7 }}>Etsy fiyatı (USD)</label>
+                  <label style={{ display: "block", fontWeight: 800, marginBottom: 7 }}>Fiyat (USD)</label>
                   <input type="number" min="0.2" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} style={input} />
                 </div>
-
-                <div style={{ padding: 14, borderRadius: 12, background: "#fff8ea", color: "#795b2f", lineHeight: 1.55, fontSize: 13 }}>
-                  Paket standardı: Etsy SEO TXT + ETSY_THUMBNAILS klasörü + Customer_Download ZIP. Full seller ZIP bu yayınlayıcıda 4.2 MB altında olmalı; müşteri ZIP'i Etsy için 20 MB altında olmalı.
-                </div>
-
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <button disabled={busy} onClick={() => submit(false)} style={{ ...primary, background: "#7e7268", opacity: busy ? .6 : 1 }}>
-                    {busy ? "İşleniyor…" : "Taslak Oluştur"}
+                  <button onClick={() => submit(false)} disabled={busy} style={{ ...button, background: "#847467", opacity: busy ? .55 : 1 }}>
+                    {busy ? "İşleniyor…" : "Önce Taslak Oluştur"}
                   </button>
-                  <button disabled={busy} onClick={() => submit(true)} style={{ ...primary, opacity: busy ? .6 : 1 }}>
-                    {busy ? "Yayınlanıyor…" : "Şimdi Etsy'de Yayınla"}
+                  <button onClick={() => submit(true)} disabled={busy} style={{ ...button, opacity: busy ? .55 : 1 }}>
+                    {busy ? "Yayınlanıyor…" : "Etsy'de Yayınla"}
                   </button>
                 </div>
               </div>
@@ -251,19 +211,15 @@ export default function PaperNexaPage() {
         )}
 
         {message && (
-          <div style={{ marginTop: 18, padding: 16, borderRadius: 12, background: "#ecf8f0", color: "#23633f", fontWeight: 700 }}>
+          <div style={{ marginTop: 18, padding: 17, borderRadius: 12, background: "#ebf7ef", color: "#23633f", fontWeight: 900 }}>
             {message}
           </div>
         )}
         {error && (
-          <div style={{ marginTop: 18, padding: 16, borderRadius: 12, background: "#fff0f0", color: "#9a3030", lineHeight: 1.5 }}>
+          <div style={{ marginTop: 18, padding: 17, borderRadius: 12, background: "#fff0f0", color: "#983131", lineHeight: 1.55 }}>
             {error}
           </div>
         )}
-
-        <p style={{ textAlign: "center", color: "#9a9087", fontSize: 12, marginTop: 24 }}>
-          “Şimdi Etsy'de Yayınla” listingi active yapar ve Etsy'nin normal listing ücretleri uygulanabilir.
-        </p>
       </div>
     </main>
   );
