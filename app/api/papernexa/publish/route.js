@@ -30,13 +30,36 @@ function chooseEntry(zip, predicate) {
   return entries.find(predicate) || null;
 }
 
+function credentials(request) {
+  const encryptedKey = request.cookies.get("papernexa_api_key")?.value;
+  const encryptedRefresh = request.cookies.get("papernexa_refresh_token")?.value;
+
+  if (encryptedKey && encryptedRefresh) {
+    return {
+      apiKey: openPaperNexaSecret(encryptedKey),
+      refreshToken: openPaperNexaSecret(encryptedRefresh),
+      source: "papernexa",
+    };
+  }
+
+  const legacyRefresh = request.cookies.get("etsy_refresh_token")?.value;
+  const legacyApiKey = process.env.ETSY_API_KEY;
+  if (legacyApiKey && legacyRefresh) {
+    return {
+      apiKey: legacyApiKey,
+      refreshToken: legacyRefresh,
+      source: "existing",
+    };
+  }
+  return null;
+}
+
 export async function POST(request) {
   try {
-    const encryptedKey = request.cookies.get("papernexa_api_key")?.value;
-    const encryptedRefresh = request.cookies.get("papernexa_refresh_token")?.value;
-    if (!encryptedKey || !encryptedRefresh) {
+    const creds = credentials(request);
+    if (!creds) {
       return NextResponse.json(
-        { error: "PaperNexa Etsy bağlantısı gerekli." },
+        { error: "Bu tarayıcıda mevcut PaperNexa Etsy oturumu bulunamadı." },
         { status: 401 }
       );
     }
@@ -59,8 +82,7 @@ export async function POST(request) {
     if (packageFile.size > 4.2 * 1024 * 1024) {
       return NextResponse.json(
         {
-          error:
-            "Paket bu yayınlayıcının güvenli yükleme sınırını aşıyor. Full seller ZIP'i 4.2 MB altına düşür.",
+          error: "Full seller ZIP 4.2 MB sınırını aşıyor.",
           size_mb: Math.round((packageFile.size / 1024 / 1024) * 100) / 100,
         },
         { status: 413 }
@@ -85,24 +107,21 @@ export async function POST(request) {
       .slice(0, 10);
 
     if (!seoEntry) {
-      return NextResponse.json({ error: "Paket içinde Etsy SEO TXT dosyası bulunamadı." }, { status: 400 });
+      return NextResponse.json({ error: "Paket içinde Etsy SEO TXT bulunamadı." }, { status: 400 });
     }
     if (!customerEntry) {
       return NextResponse.json({ error: "Paket içinde Customer_Download ZIP bulunamadı." }, { status: 400 });
     }
-    if (!imageEntries.length) {
-      return NextResponse.json({ error: "Paket içinde ETSY_THUMBNAILS görselleri bulunamadı." }, { status: 400 });
+    if (imageEntries.length < 1) {
+      return NextResponse.json({ error: "Paket içinde Etsy thumbnail bulunamadı." }, { status: 400 });
     }
 
     const seo = parseSeo(await seoEntry.async("string"));
     if (!seo.title || !seo.description) {
-      return NextResponse.json({ error: "SEO dosyasından başlık veya açıklama okunamadı." }, { status: 400 });
+      return NextResponse.json({ error: "SEO başlık veya açıklama okunamadı." }, { status: 400 });
     }
     if (seo.title.length > 140) {
-      return NextResponse.json(
-        { error: "Etsy başlığı 140 karakteri aşıyor.", title_length: seo.title.length },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Etsy başlığı 140 karakteri aşıyor." }, { status: 400 });
     }
     const invalidTags = seo.tags.filter((tag) => tag.length > 20);
     if (invalidTags.length) {
@@ -114,11 +133,9 @@ export async function POST(request) {
 
     const customerBytes = await customerEntry.async("uint8array");
     if (customerBytes.byteLength > 20 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: "Müşteri indirme ZIP'i Etsy 20 MB sınırını aşıyor." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Müşteri ZIP'i Etsy 20 MB sınırını aşıyor." }, { status: 400 });
     }
+
     const customerFile = {
       name: customerEntry.name.split("/").pop() || "PaperNexa_Customer_Download.zip",
       blob: new Blob([customerBytes], { type: "application/zip" }),
@@ -139,12 +156,9 @@ export async function POST(request) {
       });
     }
 
-    const apiKey = openPaperNexaSecret(encryptedKey);
-    const refreshToken = openPaperNexaSecret(encryptedRefresh);
-
     const result = await createDigitalListing({
-      apiKey,
-      refreshToken,
+      apiKey: creds.apiKey,
+      refreshToken: creds.refreshToken,
       title: seo.title,
       description: seo.description,
       price,
@@ -157,6 +171,7 @@ export async function POST(request) {
 
     return NextResponse.json({
       ...result,
+      connection_source: creds.source,
       thumbnail_count: images.length,
       tag_count: seo.tags.length,
       customer_file: customerFile.name,
