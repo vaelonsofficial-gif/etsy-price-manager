@@ -6,9 +6,9 @@ export default function PaperNexaPage() {
   const [status, setStatus] = useState({ connected: null });
   const [packageFile, setPackageFile] = useState(null);
   const [price, setPrice] = useState("8.99");
-  const [query, setQuery] = useState("wedding planner");
+  const [query, setQuery] = useState("planner");
   const [categories, setCategories] = useState([]);
-  const [taxonomyId, setTaxonomyId] = useState("");
+  const [taxonomyId, setTaxonomyId] = useState("12476");
   const [busy, setBusy] = useState(false);
   const [searching, setSearching] = useState(false);
   const [message, setMessage] = useState("");
@@ -48,7 +48,7 @@ export default function PaperNexaPage() {
   }, []);
 
   useEffect(() => {
-    if (status.connected && categories.length === 0) searchCategory("wedding planner");
+    if (status.connected && categories.length === 0) searchCategory("planner");
   }, [status.connected]);
 
   async function submit(activate) {
@@ -157,7 +157,7 @@ export default function PaperNexaPage() {
         {status.connected && (
           <>
             <section style={{ ...card, marginTop: 18 }}>
-              <h2 style={{ marginTop: 0 }}>1. Etsy kategorisi</h2>
+              <h2 style={{ marginTop: 0 }}>1. Etsy kategorisi</h2><div style={{ padding: "12px 14px", borderRadius: 11, background: "#edf6ef", color: "#285c3c", fontWeight: 800, marginBottom: 12 }}>Seçili: Paper & Party Supplies → Stationery → Design & Templates → Templates → Planner Templates (#12476)</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}>
                 <input value={query} onChange={(e) => setQuery(e.target.value)} style={input} />
                 <button onClick={() => searchCategory(query)} disabled={searching} style={button}>
