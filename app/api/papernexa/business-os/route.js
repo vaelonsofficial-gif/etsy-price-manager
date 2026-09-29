@@ -9,11 +9,13 @@ function credentials(request) {
   const encryptedKey = request.cookies.get("papernexa_api_key")?.value;
   const encryptedRefresh = request.cookies.get("papernexa_refresh_token")?.value;
 
-  if (encryptedKey && encryptedRefresh) {
+  if (encryptedRefresh) {
     return {
-      apiKey: openPaperNexaSecret(encryptedKey),
+      apiKey: encryptedKey
+        ? openPaperNexaSecret(encryptedKey)
+        : process.env.ETSY_API_KEY,
       refreshToken: openPaperNexaSecret(encryptedRefresh),
-      source: "papernexa",
+      source: encryptedKey ? "papernexa" : "papernexa-server-key",
     };
   }
 
@@ -61,9 +63,9 @@ export async function POST(request) {
     }
 
     const creds = credentials(request);
-    if (!creds) {
+    if (!creds?.apiKey || !creds?.refreshToken) {
       return NextResponse.json(
-        { error: "Bu tarayıcıda mevcut PaperNexa Etsy oturumu bulunamadı." },
+        { error: "PaperNexa Etsy bağlantısı bulunamadı. Önce Etsy'yi yeniden bağla." },
         { status: 401 }
       );
     }

@@ -2,15 +2,21 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { openPaperNexaSecret, keystring } from "../../../../lib/papernexa";
 
+const CANONICAL_ORIGIN = "https://etsy-price-manager.vercel.app";
+
 export async function GET(request) {
   try {
     const encryptedKey = request.cookies.get("papernexa_api_key")?.value;
-    if (!encryptedKey) {
-      return NextResponse.redirect("https://etsy-price-manager.vercel.app/papernexa?setup=required");
+    const apiKey = encryptedKey
+      ? openPaperNexaSecret(encryptedKey)
+      : process.env.ETSY_API_KEY;
+
+    if (!apiKey) {
+      return NextResponse.redirect(`${CANONICAL_ORIGIN}/papernexa?setup=required`);
     }
-    const apiKey = openPaperNexaSecret(encryptedKey);
+
     const clientId = keystring(apiKey);
-    const redirectUri = "https://etsy-price-manager.vercel.app/api/etsy/callback";
+    const redirectUri = `${CANONICAL_ORIGIN}/api/etsy/callback`;
 
     const codeVerifier = crypto.randomBytes(32).toString("base64url");
     const codeChallenge = crypto
@@ -41,6 +47,6 @@ export async function GET(request) {
     response.cookies.set("etsy_oauth_profile", "papernexa", common);
     return response;
   } catch {
-    return NextResponse.redirect("https://etsy-price-manager.vercel.app/papernexa?setup=invalid");
+    return NextResponse.redirect(`${CANONICAL_ORIGIN}/papernexa?setup=invalid`);
   }
 }
