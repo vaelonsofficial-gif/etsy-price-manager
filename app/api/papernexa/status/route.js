@@ -7,10 +7,12 @@ function credentials(request) {
   const encryptedKey = request.cookies.get("papernexa_api_key")?.value;
   const encryptedRefresh = request.cookies.get("papernexa_refresh_token")?.value;
 
-  if (encryptedKey && encryptedRefresh) {
+  if (encryptedRefresh) {
     return {
-      source: "papernexa",
-      apiKey: openPaperNexaSecret(encryptedKey),
+      source: encryptedKey ? "papernexa" : "papernexa-server-key",
+      apiKey: encryptedKey
+        ? openPaperNexaSecret(encryptedKey)
+        : process.env.ETSY_API_KEY,
       refreshToken: openPaperNexaSecret(encryptedRefresh),
     };
   }
@@ -31,11 +33,12 @@ function credentials(request) {
 export async function GET(request) {
   try {
     const creds = credentials(request);
-    if (!creds) {
+    if (!creds?.apiKey || !creds?.refreshToken) {
       return NextResponse.json({
         connected: false,
         existing_connection_found: false,
-        error: "Bu tarayıcıda mevcut Etsy oturumu bulunamadı.",
+        reconnect_available: Boolean(process.env.ETSY_API_KEY),
+        error: "Bu tarayıcıda PaperNexa Etsy oturumu bulunamadı.",
       });
     }
 
@@ -43,6 +46,7 @@ export async function GET(request) {
     return NextResponse.json({
       connected: true,
       existing_connection_found: true,
+      reconnect_available: true,
       connection_source: creds.source,
       shop: { shop_id: shop.shop_id, shop_name: shop.shop_name },
     });
@@ -50,6 +54,7 @@ export async function GET(request) {
     return NextResponse.json({
       connected: false,
       existing_connection_found: true,
+      reconnect_available: Boolean(process.env.ETSY_API_KEY),
       error: error.message,
       details: error.details || null,
     });
