@@ -52,7 +52,7 @@ export async function GET(request) {
         ? openPaperNexaSecret(encryptedKey)
         : process.env.ETSY_API_KEY;
       expectedShopName = "papernexa";
-      redirectTarget = `${PAPERNEXA_STUDIO_ORIGIN}/papernexa?etsy=connected`;
+      redirectTarget = `${CANONICAL_ORIGIN}/papernexa?etsy=connected`;
       refreshCookieName = "papernexa_refresh_token";
       encryptRefresh = true;
       redirectUri = PAPERNEXA_REDIRECT_URI;
