@@ -22,11 +22,19 @@ export async function GET(request) {
     if (!code) {
       return NextResponse.json({ error: "OAuth code bulunamadı." }, { status: 400 });
     }
+
     if (!state || !savedState || state !== savedState) {
-      return NextResponse.json({ error: "OAuth state doğrulaması başarısız." }, { status: 400 });
+      return NextResponse.json(
+        { error: "OAuth state doğrulaması başarısız." },
+        { status: 400 }
+      );
     }
+
     if (!codeVerifier) {
-      return NextResponse.json({ error: "PKCE code verifier bulunamadı." }, { status: 400 });
+      return NextResponse.json(
+        { error: "PKCE code verifier bulunamadı." },
+        { status: 400 }
+      );
     }
 
     let apiKey;
@@ -37,10 +45,9 @@ export async function GET(request) {
 
     if (profile === "papernexa") {
       const encryptedKey = request.cookies.get("papernexa_api_key")?.value;
-      if (!encryptedKey) {
-        return NextResponse.redirect(`${CANONICAL_ORIGIN}/papernexa?setup=required`);
-      }
-      apiKey = openPaperNexaSecret(encryptedKey);
+      apiKey = encryptedKey
+        ? openPaperNexaSecret(encryptedKey)
+        : process.env.ETSY_API_KEY;
       expectedShopName = "papernexa";
       redirectTarget = `${CANONICAL_ORIGIN}/papernexa?etsy=connected`;
       refreshCookieName = "papernexa_refresh_token";
@@ -95,13 +102,21 @@ export async function GET(request) {
 
     if (!shopResponse.ok) {
       return NextResponse.json(
-        { error: "Etsy mağazası doğrulanamadı.", details: shopPayload, status: shopResponse.status },
+        {
+          error: "Etsy mağazası doğrulanamadı.",
+          details: shopPayload,
+          status: shopResponse.status,
+        },
         { status: shopResponse.status }
       );
     }
+
     if (!shop?.shop_id) {
       return NextResponse.json(
-        { error: "Yetkilendirilen Etsy hesabına ait mağaza doğrulanamadı.", shop_name: shop?.shop_name || null },
+        {
+          error: "Yetkilendirilen Etsy hesabına ait mağaza doğrulanamadı.",
+          shop_name: shop?.shop_name || null,
+        },
         { status: 403 }
       );
     }
@@ -132,9 +147,11 @@ export async function GET(request) {
         path: "/",
       }
     );
+
     response.cookies.set("etsy_oauth_state", "", { maxAge: 0, path: "/" });
     response.cookies.set("etsy_code_verifier", "", { maxAge: 0, path: "/" });
     response.cookies.set("etsy_oauth_profile", "", { maxAge: 0, path: "/" });
+
     return response;
   } catch (error) {
     return NextResponse.json(
