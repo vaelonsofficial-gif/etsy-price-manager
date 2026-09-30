@@ -1,0 +1,1 @@
+PaperNexa reuses a previously verified Etsy browser session when available. Every status/publish path still validates the resolved Etsy shop name as PaperNexa through paperNexaSession before any listing write. Wrong-shop sessions are rejected.
