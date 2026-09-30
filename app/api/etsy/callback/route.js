@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { openPaperNexaSecret, sealPaperNexaSecret } from "../../../../lib/papernexa";
 
 const CANONICAL_ORIGIN = "https://etsy-price-manager.vercel.app";
+const PAPERNEXA_STUDIO_ORIGIN = "https://papernexa-studio.bekirebru07.chatgpt.site";
+const PAPERNEXA_REDIRECT_URI = `${PAPERNEXA_STUDIO_ORIGIN}/api/etsy?step=callback`;
 
 function normalizeShopPayload(payload) {
   if (payload?.shop_id) return payload;
@@ -42,6 +44,7 @@ export async function GET(request) {
     let redirectTarget;
     let refreshCookieName;
     let encryptRefresh = false;
+    let redirectUri;
 
     if (profile === "papernexa") {
       const encryptedKey = request.cookies.get("papernexa_api_key")?.value;
@@ -49,14 +52,16 @@ export async function GET(request) {
         ? openPaperNexaSecret(encryptedKey)
         : process.env.ETSY_API_KEY;
       expectedShopName = "papernexa";
-      redirectTarget = `${CANONICAL_ORIGIN}/papernexa?etsy=connected`;
+      redirectTarget = `${PAPERNEXA_STUDIO_ORIGIN}/papernexa?etsy=connected`;
       refreshCookieName = "papernexa_refresh_token";
       encryptRefresh = true;
+      redirectUri = PAPERNEXA_REDIRECT_URI;
     } else {
       apiKey = process.env.ETSY_API_KEY;
       expectedShopName = process.env.ETSY_EXPECTED_SHOP_NAME?.trim().toLowerCase();
       redirectTarget = `${CANONICAL_ORIGIN}/?etsy=connected`;
       refreshCookieName = "etsy_refresh_token";
+      redirectUri = `${CANONICAL_ORIGIN}/api/etsy/callback`;
     }
 
     const keystring = apiKey?.split(":")[0];
@@ -64,7 +69,6 @@ export async function GET(request) {
       return NextResponse.json({ error: "Etsy API anahtarı eksik." }, { status: 500 });
     }
 
-    const redirectUri = `${CANONICAL_ORIGIN}/api/etsy/callback`;
     const tokenResponse = await fetch("https://api.etsy.com/v3/public/oauth/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
