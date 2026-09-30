@@ -38,15 +38,19 @@ function credentials(request) {
 }
 
 export async function GET(request) {
+  const serverOauthReady = Boolean(process.env.ETSY_API_KEY);
+
   try {
     const creds = credentials(request);
     if (!creds) {
       return NextResponse.json({
-        configured: false,
+        configured: serverOauthReady,
         connected: false,
         existing_connection_found: false,
-        connection_source: null,
-        error: "Daha önce doğrulanmış PaperNexa Etsy oturumu bulunamadı.",
+        connection_source: serverOauthReady ? "server-oauth-ready" : null,
+        error: serverOauthReady
+          ? "PaperNexa için tek tık Etsy yetkilendirmesi gerekli."
+          : "Etsy OAuth uygulama anahtarı sunucuda bulunamadı.",
       });
     }
 
@@ -62,7 +66,7 @@ export async function GET(request) {
     });
   } catch (error) {
     return NextResponse.json({
-      configured: true,
+      configured: serverOauthReady,
       connected: false,
       existing_connection_found: true,
       connection_source: "existing-session-check",
