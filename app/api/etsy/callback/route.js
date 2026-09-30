@@ -18,6 +18,7 @@ export async function GET(request) {
     const savedState = request.cookies.get("etsy_oauth_state")?.value;
     const codeVerifier = request.cookies.get("etsy_code_verifier")?.value;
     const profile = request.cookies.get("etsy_oauth_profile")?.value || "vaelons";
+    const pluginOauthPending = request.cookies.get("plugin_oauth_pending")?.value || "";
 
     if (!code) {
       return NextResponse.json({ error: "OAuth code bulunamadı." }, { status: 400 });
@@ -55,7 +56,9 @@ export async function GET(request) {
     } else {
       apiKey = process.env.ETSY_API_KEY;
       expectedShopName = process.env.ETSY_EXPECTED_SHOP_NAME?.trim().toLowerCase();
-      redirectTarget = `${CANONICAL_ORIGIN}/?etsy=connected`;
+      redirectTarget = pluginOauthPending
+        ? `${CANONICAL_ORIGIN}/api/plugin/oauth/authorize?resume=1`
+        : `${CANONICAL_ORIGIN}/?etsy=connected`;
       refreshCookieName = "etsy_refresh_token";
     }
 
