@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import JSZip from "jszip";
-import {
-  openPaperNexaSecret,
-  createDigitalListing,
-} from "../../../../lib/papernexa";
+import { openPaperNexaSecret, createDigitalListing } from "../../../../lib/papernexa";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -13,7 +10,6 @@ function parseSeo(text) {
   const titleMatch = normalized.match(/(?:^|\n)TITLE\s*\n([\s\S]*?)(?=\n\s*\nDESCRIPTION\s*\n)/i);
   const descMatch = normalized.match(/(?:^|\n)DESCRIPTION\s*\n([\s\S]*?)(?=\n\s*\n(?:13\s+)?TAGS?\s*\n)/i);
   const tagsMatch = normalized.match(/(?:^|\n)(?:13\s+)?TAGS?\s*\n([\s\S]*)$/i);
-
   const title = titleMatch?.[1]?.trim() || "";
   const description = descMatch?.[1]?.trim() || "";
   const tags = (tagsMatch?.[1] || "")
@@ -21,7 +17,6 @@ function parseSeo(text) {
     .map((x) => x.replace(/^[-•\d.\s]+/, "").trim())
     .filter(Boolean)
     .slice(0, 13);
-
   return { title, description, tags };
 }
 
@@ -33,35 +28,20 @@ function chooseEntry(zip, predicate) {
 function credentials(request) {
   const encryptedKey = request.cookies.get("papernexa_api_key")?.value;
   const encryptedRefresh = request.cookies.get("papernexa_refresh_token")?.value;
-
-  if (encryptedRefresh) {
-    return {
-      apiKey: encryptedKey
-        ? openPaperNexaSecret(encryptedKey)
-        : process.env.ETSY_API_KEY,
-      refreshToken: openPaperNexaSecret(encryptedRefresh),
-      source: encryptedKey ? "papernexa" : "papernexa-server-key",
-    };
-  }
-
-  const legacyRefresh = request.cookies.get("etsy_refresh_token")?.value;
-  const legacyApiKey = process.env.ETSY_API_KEY;
-  if (legacyApiKey && legacyRefresh) {
-    return {
-      apiKey: legacyApiKey,
-      refreshToken: legacyRefresh,
-      source: "existing",
-    };
-  }
-  return null;
+  if (!encryptedKey || !encryptedRefresh) return null;
+  return {
+    apiKey: openPaperNexaSecret(encryptedKey),
+    refreshToken: openPaperNexaSecret(encryptedRefresh),
+    source: "papernexa-dedicated",
+  };
 }
 
 export async function POST(request) {
   try {
     const creds = credentials(request);
-    if (!creds?.apiKey || !creds?.refreshToken) {
+    if (!creds) {
       return NextResponse.json(
-        { error: "PaperNexa Etsy bağlantısı bulunamadı. Önce Etsy'yi yeniden bağla." },
+        { error: "PaperNexa'nın kendi Etsy bağlantısı bulunamadı. Önce PaperNexa panelinden bağlan." },
         { status: 401 }
       );
     }
@@ -83,10 +63,7 @@ export async function POST(request) {
     }
     if (packageFile.size > 4.2 * 1024 * 1024) {
       return NextResponse.json(
-        {
-          error: "Full seller ZIP 4.2 MB sınırını aşıyor.",
-          size_mb: Math.round((packageFile.size / 1024 / 1024) * 100) / 100,
-        },
+        { error: "Full seller ZIP 4.2 MB sınırını aşıyor.", size_mb: Math.round((packageFile.size / 1024 / 1024) * 100) / 100 },
         { status: 413 }
       );
     }
@@ -95,42 +72,22 @@ export async function POST(request) {
     const seoEntry = chooseEntry(zip, (entry) =>
       /(?:ETSY_)?SEO\.txt$/i.test(entry.name) || /ETSY.*SEO.*\.txt$/i.test(entry.name)
     );
-    const customerEntry = chooseEntry(zip, (entry) =>
-      /Customer_Download.*\.zip$/i.test(entry.name)
-    );
+    const customerEntry = chooseEntry(zip, (entry) => /Customer_Download.*\.zip$/i.test(entry.name));
     const imageEntries = Object.values(zip.files)
-      .filter(
-        (entry) =>
-          !entry.dir &&
-          /ETSY_THUMBNAILS\//i.test(entry.name) &&
-          /\.(jpe?g|png|webp)$/i.test(entry.name)
-      )
+      .filter((entry) => !entry.dir && /ETSY_THUMBNAILS\//i.test(entry.name) && /\.(jpe?g|png|webp)$/i.test(entry.name))
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
       .slice(0, 10);
 
-    if (!seoEntry) {
-      return NextResponse.json({ error: "Paket içinde Etsy SEO TXT bulunamadı." }, { status: 400 });
-    }
-    if (!customerEntry) {
-      return NextResponse.json({ error: "Paket içinde Customer_Download ZIP bulunamadı." }, { status: 400 });
-    }
-    if (imageEntries.length < 1) {
-      return NextResponse.json({ error: "Paket içinde Etsy thumbnail bulunamadı." }, { status: 400 });
-    }
+    if (!seoEntry) return NextResponse.json({ error: "Paket içinde Etsy SEO TXT bulunamadı." }, { status: 400 });
+    if (!customerEntry) return NextResponse.json({ error: "Paket içinde Customer_Download ZIP bulunamadı." }, { status: 400 });
+    if (imageEntries.length < 1) return NextResponse.json({ error: "Paket içinde Etsy thumbnail bulunamadı." }, { status: 400 });
 
     const seo = parseSeo(await seoEntry.async("string"));
-    if (!seo.title || !seo.description) {
-      return NextResponse.json({ error: "SEO başlık veya açıklama okunamadı." }, { status: 400 });
-    }
-    if (seo.title.length > 140) {
-      return NextResponse.json({ error: "Etsy başlığı 140 karakteri aşıyor." }, { status: 400 });
-    }
+    if (!seo.title || !seo.description) return NextResponse.json({ error: "SEO başlık veya açıklama okunamadı." }, { status: 400 });
+    if (seo.title.length > 140) return NextResponse.json({ error: "Etsy başlığı 140 karakteri aşıyor." }, { status: 400 });
     const invalidTags = seo.tags.filter((tag) => tag.length > 20);
     if (invalidTags.length) {
-      return NextResponse.json(
-        { error: "20 karakteri aşan Etsy tagleri var.", invalid_tags: invalidTags },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "20 karakteri aşan Etsy tagleri var.", invalid_tags: invalidTags }, { status: 400 });
     }
 
     const customerBytes = await customerEntry.async("uint8array");
@@ -147,11 +104,7 @@ export async function POST(request) {
     for (const entry of imageEntries) {
       const bytes = await entry.async("uint8array");
       const lower = entry.name.toLowerCase();
-      const type = lower.endsWith(".png")
-        ? "image/png"
-        : lower.endsWith(".webp")
-        ? "image/webp"
-        : "image/jpeg";
+      const type = lower.endsWith(".png") ? "image/png" : lower.endsWith(".webp") ? "image/webp" : "image/jpeg";
       images.push({
         name: entry.name.split("/").pop() || `thumbnail-${images.length + 1}.jpg`,
         blob: new Blob([bytes], { type }),
@@ -181,10 +134,7 @@ export async function POST(request) {
     });
   } catch (error) {
     return NextResponse.json(
-      {
-        error: error.message || "PaperNexa listing oluşturulamadı.",
-        details: error.details || null,
-      },
+      { error: error.message || "PaperNexa listing oluşturulamadı.", details: error.details || null },
       { status: error.status || 500 }
     );
   }
