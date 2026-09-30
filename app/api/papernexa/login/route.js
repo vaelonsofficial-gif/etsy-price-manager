@@ -2,7 +2,8 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { openPaperNexaSecret, keystring } from "../../../../lib/papernexa";
 
-const CANONICAL_ORIGIN = "https://etsy-price-manager.vercel.app";
+const STUDIO_ORIGIN = "https://papernexa-studio.bekirebru07.chatgpt.site";
+const OAUTH_REDIRECT_URI = `${STUDIO_ORIGIN}/api/etsy?step=callback`;
 
 export async function GET(request) {
   try {
@@ -12,12 +13,10 @@ export async function GET(request) {
       : process.env.ETSY_API_KEY;
 
     if (!apiKey) {
-      return NextResponse.redirect(`${CANONICAL_ORIGIN}/papernexa?setup=required`);
+      return NextResponse.redirect(`${STUDIO_ORIGIN}/papernexa?setup=required`);
     }
 
     const clientId = keystring(apiKey);
-    const redirectUri = `${CANONICAL_ORIGIN}/api/etsy/callback`;
-
     const codeVerifier = crypto.randomBytes(32).toString("base64url");
     const codeChallenge = crypto
       .createHash("sha256")
@@ -27,7 +26,7 @@ export async function GET(request) {
 
     const url = new URL("https://www.etsy.com/oauth/connect");
     url.searchParams.set("response_type", "code");
-    url.searchParams.set("redirect_uri", redirectUri);
+    url.searchParams.set("redirect_uri", OAUTH_REDIRECT_URI);
     url.searchParams.set("scope", "listings_r listings_w");
     url.searchParams.set("client_id", clientId);
     url.searchParams.set("state", state);
@@ -47,6 +46,6 @@ export async function GET(request) {
     response.cookies.set("etsy_oauth_profile", "papernexa", common);
     return response;
   } catch {
-    return NextResponse.redirect(`${CANONICAL_ORIGIN}/papernexa?setup=invalid`);
+    return NextResponse.redirect(`${STUDIO_ORIGIN}/papernexa?setup=invalid`);
   }
 }
