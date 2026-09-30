@@ -1,0 +1,1 @@
+PaperNexa one-click OAuth uses the existing server Etsy app only to initiate authorization. The callback accepts the token only after resolving the authorized shop and verifying the shop name is exactly PaperNexa. On success it stores the PaperNexa refresh token and the API key in encrypted HttpOnly cookies for subsequent publishing.
