@@ -8,27 +8,12 @@ export const maxDuration = 60;
 function credentials(request) {
   const encryptedKey = request.cookies.get("papernexa_api_key")?.value;
   const encryptedRefresh = request.cookies.get("papernexa_refresh_token")?.value;
-
-  if (encryptedRefresh) {
-    return {
-      apiKey: encryptedKey
-        ? openPaperNexaSecret(encryptedKey)
-        : process.env.ETSY_API_KEY,
-      refreshToken: openPaperNexaSecret(encryptedRefresh),
-      source: encryptedKey ? "papernexa" : "papernexa-server-key",
-    };
-  }
-
-  const legacyRefresh = request.cookies.get("etsy_refresh_token")?.value;
-  const legacyApiKey = process.env.ETSY_API_KEY;
-  if (legacyApiKey && legacyRefresh) {
-    return {
-      apiKey: legacyApiKey,
-      refreshToken: legacyRefresh,
-      source: "existing",
-    };
-  }
-  return null;
+  if (!encryptedKey || !encryptedRefresh) return null;
+  return {
+    apiKey: openPaperNexaSecret(encryptedKey),
+    refreshToken: openPaperNexaSecret(encryptedRefresh),
+    source: "papernexa-dedicated",
+  };
 }
 
 export async function POST(request) {
@@ -63,9 +48,9 @@ export async function POST(request) {
     }
 
     const creds = credentials(request);
-    if (!creds?.apiKey || !creds?.refreshToken) {
+    if (!creds) {
       return NextResponse.json(
-        { error: "PaperNexa Etsy bağlantısı bulunamadı. Önce Etsy'yi yeniden bağla." },
+        { error: "PaperNexa'nın kendi Etsy bağlantısı bulunamadı. Önce PaperNexa panelinden bağlan." },
         { status: 401 }
       );
     }
@@ -104,10 +89,7 @@ export async function POST(request) {
     });
   } catch (error) {
     return NextResponse.json(
-      {
-        error: error.message || "Business OS paketi oluşturulamadı.",
-        details: error.details || null,
-      },
+      { error: error.message || "Business OS paketi oluşturulamadı.", details: error.details || null },
       { status: error.status || 500 }
     );
   }
