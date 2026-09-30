@@ -7,17 +7,17 @@ const CANONICAL_ORIGIN = "https://etsy-price-manager.vercel.app";
 export async function GET(request) {
   try {
     const encryptedKey = request.cookies.get("papernexa_api_key")?.value;
-    const apiKey = encryptedKey
-      ? openPaperNexaSecret(encryptedKey)
-      : process.env.ETSY_API_KEY;
-
-    if (!apiKey) {
+    if (!encryptedKey) {
       return NextResponse.redirect(`${CANONICAL_ORIGIN}/papernexa?setup=required`);
     }
 
+    const apiKey = openPaperNexaSecret(encryptedKey);
     const clientId = keystring(apiKey);
-    const redirectUri = `${CANONICAL_ORIGIN}/api/etsy/callback`;
+    if (!clientId) {
+      return NextResponse.redirect(`${CANONICAL_ORIGIN}/papernexa?setup=invalid`);
+    }
 
+    const redirectUri = `${CANONICAL_ORIGIN}/api/etsy/callback`;
     const codeVerifier = crypto.randomBytes(32).toString("base64url");
     const codeChallenge = crypto
       .createHash("sha256")
