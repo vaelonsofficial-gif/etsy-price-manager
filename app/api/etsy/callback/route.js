@@ -136,17 +136,27 @@ export async function GET(request) {
     }
 
     const response = NextResponse.redirect(redirectTarget);
+    const persistentCookie = {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 90 * 24 * 60 * 60,
+      path: "/",
+    };
+
     response.cookies.set(
       refreshCookieName,
       encryptRefresh ? sealPaperNexaSecret(data.refresh_token) : data.refresh_token,
-      {
-        httpOnly: true,
-        secure: true,
-        sameSite: "lax",
-        maxAge: 90 * 24 * 60 * 60,
-        path: "/",
-      }
+      persistentCookie
     );
+
+    if (profile === "papernexa") {
+      response.cookies.set(
+        "papernexa_api_key",
+        sealPaperNexaSecret(apiKey),
+        persistentCookie
+      );
+    }
 
     response.cookies.set("etsy_oauth_state", "", { maxAge: 0, path: "/" });
     response.cookies.set("etsy_code_verifier", "", { maxAge: 0, path: "/" });
