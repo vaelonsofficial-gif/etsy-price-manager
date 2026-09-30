@@ -7,10 +7,12 @@ function credentials(request) {
   const encryptedKey = request.cookies.get("papernexa_api_key")?.value;
   const encryptedRefresh = request.cookies.get("papernexa_refresh_token")?.value;
 
-  if (encryptedKey && encryptedRefresh) {
+  if (encryptedRefresh) {
     return {
-      source: "papernexa-dedicated",
-      apiKey: openPaperNexaSecret(encryptedKey),
+      source: encryptedKey ? "papernexa-dedicated" : "papernexa-server-key",
+      apiKey: encryptedKey
+        ? openPaperNexaSecret(encryptedKey)
+        : process.env.ETSY_API_KEY,
       refreshToken: openPaperNexaSecret(encryptedRefresh),
     };
   }
@@ -38,33 +40,38 @@ function credentials(request) {
 }
 
 export async function GET(request) {
+  const serverOauthReady = Boolean(process.env.ETSY_API_KEY);
+
   try {
     const creds = credentials(request);
-    if (!creds) {
+    if (!creds?.apiKey || !creds?.refreshToken) {
       return NextResponse.json({
-        configured: false,
+        configured: serverOauthReady,
         connected: false,
         existing_connection_found: false,
-        connection_source: null,
-        error: "Daha önce doğrulanmış PaperNexa Etsy oturumu bulunamadı.",
+        reconnect_available: serverOauthReady,
+        connection_source: serverOauthReady ? "server-oauth-ready" : null,
+        error: serverOauthReady
+          ? "PaperNexa için Etsy yetkilendirmesi gerekli."
+          : "Etsy OAuth uygulama anahtarı sunucuda bulunamadı.",
       });
     }
 
-    // Refresh token ownership is not trusted by itself: PaperNexa shop identity is mandatory.
     const { shop } = await paperNexaSession(creds.apiKey, creds.refreshToken);
-
     return NextResponse.json({
       configured: true,
       connected: true,
       existing_connection_found: true,
+      reconnect_available: true,
       connection_source: creds.source,
       shop: { shop_id: shop.shop_id, shop_name: shop.shop_name },
     });
   } catch (error) {
     return NextResponse.json({
-      configured: true,
+      configured: serverOauthReady,
       connected: false,
       existing_connection_found: true,
+      reconnect_available: serverOauthReady,
       connection_source: "existing-session-check",
       error: error.message,
       details: error.details || null,
