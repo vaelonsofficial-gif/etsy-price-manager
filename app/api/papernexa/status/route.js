@@ -15,13 +15,22 @@ function credentials(request) {
     };
   }
 
-  const existingRefresh = request.cookies.get("etsy_refresh_token")?.value;
   const existingApiKey = process.env.ETSY_API_KEY;
-  if (existingApiKey && existingRefresh) {
+  const browserRefresh = request.cookies.get("etsy_refresh_token")?.value;
+  if (existingApiKey && browserRefresh) {
     return {
-      source: "existing-verified-session",
+      source: "existing-browser-session",
       apiKey: existingApiKey,
-      refreshToken: existingRefresh,
+      refreshToken: browserRefresh,
+    };
+  }
+
+  const persistentRefresh = process.env.ETSY_REFRESH_TOKEN;
+  if (existingApiKey && persistentRefresh) {
+    return {
+      source: "existing-server-session",
+      apiKey: existingApiKey,
+      refreshToken: persistentRefresh,
     };
   }
 
@@ -37,11 +46,11 @@ export async function GET(request) {
         connected: false,
         existing_connection_found: false,
         connection_source: null,
-        error: "Bu tarayıcıda daha önce doğrulanmış Etsy oturumu bulunamadı.",
+        error: "Daha önce doğrulanmış PaperNexa Etsy oturumu bulunamadı.",
       });
     }
 
-    // paperNexaSession refreshes the token and refuses any shop whose name is not PaperNexa.
+    // Refresh token ownership is not trusted by itself: PaperNexa shop identity is mandatory.
     const { shop } = await paperNexaSession(creds.apiKey, creds.refreshToken);
 
     return NextResponse.json({

@@ -16,13 +16,22 @@ function credentials(request) {
     };
   }
 
-  const existingRefresh = request.cookies.get("etsy_refresh_token")?.value;
   const existingApiKey = process.env.ETSY_API_KEY;
-  if (existingApiKey && existingRefresh) {
+  const browserRefresh = request.cookies.get("etsy_refresh_token")?.value;
+  if (existingApiKey && browserRefresh) {
     return {
       apiKey: existingApiKey,
-      refreshToken: existingRefresh,
-      source: "existing-verified-session",
+      refreshToken: browserRefresh,
+      source: "existing-browser-session",
+    };
+  }
+
+  const persistentRefresh = process.env.ETSY_REFRESH_TOKEN;
+  if (existingApiKey && persistentRefresh) {
+    return {
+      apiKey: existingApiKey,
+      refreshToken: persistentRefresh,
+      source: "existing-server-session",
     };
   }
 
@@ -63,7 +72,7 @@ export async function POST(request) {
     const creds = credentials(request);
     if (!creds) {
       return NextResponse.json(
-        { error: "Bu tarayıcıda daha önce doğrulanmış PaperNexa Etsy oturumu bulunamadı." },
+        { error: "Daha önce doğrulanmış PaperNexa Etsy oturumu bulunamadı." },
         { status: 401 }
       );
     }
@@ -78,7 +87,6 @@ export async function POST(request) {
       blob: new Blob([new Uint8Array(item.buffer)], { type: "image/jpeg" }),
     }));
 
-    // createDigitalListing always validates that the connected shop is exactly PaperNexa.
     const result = await createDigitalListing({
       apiKey: creds.apiKey,
       refreshToken: creds.refreshToken,
