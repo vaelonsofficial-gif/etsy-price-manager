@@ -8,12 +8,25 @@ export const maxDuration = 60;
 function credentials(request) {
   const encryptedKey = request.cookies.get("papernexa_api_key")?.value;
   const encryptedRefresh = request.cookies.get("papernexa_refresh_token")?.value;
-  if (!encryptedKey || !encryptedRefresh) return null;
-  return {
-    apiKey: openPaperNexaSecret(encryptedKey),
-    refreshToken: openPaperNexaSecret(encryptedRefresh),
-    source: "papernexa-dedicated",
-  };
+  if (encryptedKey && encryptedRefresh) {
+    return {
+      apiKey: openPaperNexaSecret(encryptedKey),
+      refreshToken: openPaperNexaSecret(encryptedRefresh),
+      source: "papernexa-dedicated",
+    };
+  }
+
+  const existingRefresh = request.cookies.get("etsy_refresh_token")?.value;
+  const existingApiKey = process.env.ETSY_API_KEY;
+  if (existingApiKey && existingRefresh) {
+    return {
+      apiKey: existingApiKey,
+      refreshToken: existingRefresh,
+      source: "existing-verified-session",
+    };
+  }
+
+  return null;
 }
 
 export async function POST(request) {
@@ -50,7 +63,7 @@ export async function POST(request) {
     const creds = credentials(request);
     if (!creds) {
       return NextResponse.json(
-        { error: "PaperNexa'nın kendi Etsy bağlantısı bulunamadı. Önce PaperNexa panelinden bağlan." },
+        { error: "Bu tarayıcıda daha önce doğrulanmış PaperNexa Etsy oturumu bulunamadı." },
         { status: 401 }
       );
     }
@@ -65,6 +78,7 @@ export async function POST(request) {
       blob: new Blob([new Uint8Array(item.buffer)], { type: "image/jpeg" }),
     }));
 
+    // createDigitalListing always validates that the connected shop is exactly PaperNexa.
     const result = await createDigitalListing({
       apiKey: creds.apiKey,
       refreshToken: creds.refreshToken,
