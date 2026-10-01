@@ -9,6 +9,7 @@ export async function GET() {
     global_pricing_mode: "price-independent-subset-batched-verified",
     batch_size: 25,
     write_verification: true,
+  canonical_host: "etsy-price-manager.vercel.app",
     etsy_env_configured: Boolean(process.env.ETSY_API_KEY),
     credential_mode: "server-only",
     user_key_input_required: false,
