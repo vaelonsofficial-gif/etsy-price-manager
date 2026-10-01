@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - plugin-oauth-v1
+      - main
   workflow_dispatch:
 
 jobs:
