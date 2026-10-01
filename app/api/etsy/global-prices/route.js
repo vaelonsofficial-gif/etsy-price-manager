@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { scanGlobalVariations, applyGlobalVariationPrice } from "../../../../lib/etsy";
+import { scanGlobalVariations, previewGlobalVariationPrice, applyGlobalVariationPrice } from "../../../../lib/etsy";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -23,7 +23,8 @@ export async function GET() {
 export async function POST(request) {
   try {
     const body = await request.json();
-    if (body?.confirm !== true) return NextResponse.json({ error: "confirm=true gerekli." }, { status: 400 });
+    if (body?.preview === true) return NextResponse.json(await previewGlobalVariationPrice({ variationKey: body.variationKey, refreshToken: await token() }));
+    if (body?.confirm !== true) return NextResponse.json({ error: "Önizleme veya confirm=true gerekli." }, { status: 400 });
     return NextResponse.json(await applyGlobalVariationPrice({ variationKey: body.variationKey, price: body.price, refreshToken: await token() }));
   } catch (e) {
     return NextResponse.json({ error: e.message, details: e.details || null }, { status: e.status || 500 });
