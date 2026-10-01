@@ -1,8 +1,11 @@
 import crypto from "crypto";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const keystring = process.env.ETSY_API_KEY?.split(":")[0];
+  const store = await cookies();
+  const apiKey = process.env.ETSY_API_KEY || store.get("etsy_api_key")?.value;
+  const keystring = apiKey?.split(":")[0];
   const redirectUri =
     "https://etsy-price-manager.vercel.app/api/etsy/callback";
 
