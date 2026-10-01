@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { openPaperNexaSecret, sealPaperNexaSecret } from "../../../../lib/papernexa";
 
-const CANONICAL_ORIGIN = "https://etsy-price-manager.vercel.app";
-
 function normalizeShopPayload(payload) {
   if (payload?.shop_id) return payload;
   if (Array.isArray(payload?.results) && payload.results.length) return payload.results[0];
@@ -13,6 +11,7 @@ function normalizeShopPayload(payload) {
 export async function GET(request) {
   try {
     const url = new URL(request.url);
+    const canonicalOrigin = url.origin;
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
     const savedState = request.cookies.get("etsy_oauth_state")?.value;
@@ -50,15 +49,15 @@ export async function GET(request) {
         ? openPaperNexaSecret(encryptedKey)
         : process.env.ETSY_API_KEY;
       expectedShopName = "papernexa";
-      redirectTarget = `${CANONICAL_ORIGIN}/papernexa?etsy=connected`;
+      redirectTarget = `${canonicalOrigin}/papernexa?etsy=connected`;
       refreshCookieName = "papernexa_refresh_token";
       encryptRefresh = true;
     } else {
       apiKey = process.env.ETSY_API_KEY || request.cookies.get("etsy_api_key")?.value;
       expectedShopName = process.env.ETSY_EXPECTED_SHOP_NAME?.trim().toLowerCase();
       redirectTarget = pluginOauthPending
-        ? `${CANONICAL_ORIGIN}/api/plugin/oauth/authorize?resume=1`
-        : `${CANONICAL_ORIGIN}/?etsy=connected`;
+        ? `${canonicalOrigin}/api/plugin/oauth/authorize?resume=1`
+        : `${canonicalOrigin}/?etsy=connected`;
       refreshCookieName = "etsy_refresh_token";
     }
 
@@ -67,7 +66,7 @@ export async function GET(request) {
       return NextResponse.json({ error: "Etsy API anahtarı eksik." }, { status: 500 });
     }
 
-    const redirectUri = `${CANONICAL_ORIGIN}/api/etsy/callback`;
+    const redirectUri = `${canonicalOrigin}/api/etsy/callback`;
     const tokenResponse = await fetch("https://api.etsy.com/v3/public/oauth/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
