@@ -184,6 +184,7 @@ export default function Home() {
       for(let i=0;i<ids.length;i+=25) batches.push(ids.slice(i,i+25));
 
       let changed=0;
+      let verified=0;
       for(let index=0;index<batches.length;index++){
         setGlobalMessage(`Fiyat uygulanıyor: ${changed}/${ids.length} tamamlandı · paket ${index+1}/${batches.length}`);
         let lastError=null;
@@ -202,9 +203,10 @@ export default function Home() {
         }
         if(lastError) throw new Error(`${changed}/${ids.length} listing tamamlandı. Kalan paket durdu: ${lastError.message}`);
         changed+=Number(data?.listings_changed||0);
+        verified+=Number(data?.listings_verified||0);
       }
 
-      setGlobalMessage(`Başarılı: ${changed}/${ids.length} eşleşen aktif listing güncellendi. Mevcut eski fiyatlar eşleştirmede kullanılmadı.`);
+      setGlobalMessage(`Başarılı: ${changed}/${ids.length} eşleşen aktif listing güncellendi; ${verified} listing Etsy'den geri okunarak doğrulandı. Mevcut eski fiyatlar eşleştirmede kullanılmadı.`);
     } catch(err){setGlobalError(err.message||"Toplu güncelleme başarısız.");} finally{setGlobalLoading(false);}
   }
 
