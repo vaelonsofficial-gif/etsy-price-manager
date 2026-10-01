@@ -90,6 +90,25 @@ export default function Home() {
     loadDrafts();
   }, []);
 
+  useEffect(() => {
+    if (connected === true) {
+      try { sessionStorage.removeItem("vaelons_etsy_oauth_started"); } catch {}
+      return;
+    }
+
+    if (connected !== false || apiKeyConfigured !== true || bridgeConfigured) return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("etsy") === "error") return;
+
+    try {
+      if (sessionStorage.getItem("vaelons_etsy_oauth_started") === "1") return;
+      sessionStorage.setItem("vaelons_etsy_oauth_started", "1");
+    } catch {}
+
+    window.location.assign("/api/etsy/login");
+  }, [connected, apiKeyConfigured, bridgeConfigured]);
+
   function setListingTime(listingId, value) {
     const id = String(listingId);
     setScheduleTimes((current) => ({ ...current, [id]: value }));
