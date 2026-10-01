@@ -5,6 +5,7 @@ on:
     branches:
       - plugin-oauth-v1
       - main
+      - security/server-only-etsy-credential
   workflow_dispatch:
 
 jobs:
