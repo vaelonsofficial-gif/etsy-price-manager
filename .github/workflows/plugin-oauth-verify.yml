@@ -5,6 +5,7 @@ on:
     branches:
       - plugin-oauth-v1
       - main
+      - fix/final-global-pricing-hardening
   workflow_dispatch:
 
 jobs:
