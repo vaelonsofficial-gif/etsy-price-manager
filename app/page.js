@@ -168,14 +168,43 @@ export default function Home() {
   }
   async function applyGlobalPrice(v) {
     const value=Number(globalPrices[v.key]); if(!Number.isFinite(value)||value<=0) return setGlobalError("Geçerli bir yeni fiyat gir.");
-    setGlobalLoading(true); setGlobalError(""); setGlobalMessage("Eşleşen listingler güvenli biçimde önizleniyor…");
+    setGlobalLoading(true); setGlobalError(""); setGlobalMessage("Tüm aktif listingler taranıyor; mevcut fiyatlar dikkate alınmıyor…");
     try {
       const previewResponse=await fetch("/api/etsy/global-prices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({variationKey:v.key,preview:true})});
       const preview=await previewResponse.json(); if(!previewResponse.ok) throw new Error(preview.error||"Önizleme başarısız.");
       if(!preview.matched_listing_count) throw new Error("Bu varyasyonla eşleşen aktif listing bulunamadı.");
-      if(!window.confirm(`${v.label}\n\n${preview.matched_listing_count} aktif listing eşleşti (${preview.active_listings_scanned} tarandı). Tümüne ${value} uygulansın mı? Diğer varyasyonlara dokunulmayacak.`)) { setGlobalMessage("İşlem iptal edildi; fiyat değiştirilmedi."); return; }
-      const response=await fetch("/api/etsy/global-prices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({variationKey:v.key,price:value,confirm:true})});
-      const data=await response.json(); if(!response.ok) throw new Error(data.error||"Toplu güncelleme başarısız."); setGlobalMessage(`Başarılı: ${data.listings_changed} listing güncellendi.`);
+
+      if(!window.confirm(`${v.label}\n\n${preview.active_listings_scanned} aktif listing tarandı; ${preview.matched_listing_count} listing bu varyasyonla eşleşti. Mevcut fiyatları ne olursa olsun eşleşenlerin tamamına ${value} uygulanacak. Devam edilsin mi?`)) {
+        setGlobalMessage("İşlem iptal edildi; fiyat değiştirilmedi.");
+        return;
+      }
+
+      const ids=(preview.matched||[]).map((item)=>String(item.listing_id));
+      const batches=[];
+      for(let i=0;i<ids.length;i+=25) batches.push(ids.slice(i,i+25));
+
+      let changed=0;
+      for(let index=0;index<batches.length;index++){
+        setGlobalMessage(`Fiyat uygulanıyor: ${changed}/${ids.length} tamamlandı · paket ${index+1}/${batches.length}`);
+        let lastError=null;
+        let data=null;
+        for(let attempt=0;attempt<3;attempt++){
+          try{
+            const response=await fetch("/api/etsy/global-prices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({variationKey:v.key,price:value,confirm:true,listingIds:batches[index]})});
+            data=await response.json();
+            if(!response.ok) throw new Error(data.error||"Toplu güncelleme başarısız.");
+            lastError=null;
+            break;
+          }catch(error){
+            lastError=error;
+            if(attempt<2) await new Promise((resolve)=>setTimeout(resolve,3000*(attempt+1)));
+          }
+        }
+        if(lastError) throw new Error(`${changed}/${ids.length} listing tamamlandı. Kalan paket durdu: ${lastError.message}`);
+        changed+=Number(data?.listings_changed||0);
+      }
+
+      setGlobalMessage(`Başarılı: ${changed}/${ids.length} eşleşen aktif listing güncellendi. Mevcut eski fiyatlar eşleştirmede kullanılmadı.`);
     } catch(err){setGlobalError(err.message||"Toplu güncelleme başarısız.");} finally{setGlobalLoading(false);}
   }
 
