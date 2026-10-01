@@ -5,7 +5,6 @@ on:
     branches:
       - plugin-oauth-v1
       - main
-      - fix/portable-etsy-api-key
   workflow_dispatch:
 
 jobs:
