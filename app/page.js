@@ -27,6 +27,12 @@ export default function Home() {
   const [priceLoading, setPriceLoading] = useState(false);
   const [priceMessage, setPriceMessage] = useState("");
   const [priceError, setPriceError] = useState("");
+  const [globalVariations, setGlobalVariations] = useState([]);
+  const [globalListingCount, setGlobalListingCount] = useState(0);
+  const [globalPrices, setGlobalPrices] = useState({});
+  const [globalLoading, setGlobalLoading] = useState(false);
+  const [globalMessage, setGlobalMessage] = useState("");
+  const [globalError, setGlobalError] = useState("");
 
   const timezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Yerel saat",
@@ -111,6 +117,19 @@ export default function Home() {
     }
   }
 
+
+  async function scanGlobalPrices() {
+    setGlobalLoading(true); setGlobalError(""); setGlobalMessage("");
+    try { const response=await fetch("/api/etsy/global-prices",{cache:"no-store"}); const data=await response.json(); if(!response.ok) throw new Error(data.error||"Varyasyonlar taranamadı."); setGlobalVariations(data.variations||[]); setGlobalListingCount(data.active_listing_count||0); setGlobalMessage(`${data.active_listing_count||0} aktif listing tarandı. ${(data.variations||[]).length} varyasyon bulundu.`); }
+    catch(err){setGlobalError(err.message||"Varyasyonlar taranamadı.");} finally{setGlobalLoading(false);}
+  }
+  async function applyGlobalPrice(v) {
+    const value=Number(globalPrices[v.key]); if(!Number.isFinite(value)||value<=0) return setGlobalError("Geçerli bir yeni fiyat gir.");
+    if(!window.confirm(`${v.label}\n\n${v.listing_count} listingde eşleşiyor. Tümüne ${value} uygulansın mı? Diğer varyasyonlara dokunulmayacak.`)) return;
+    setGlobalLoading(true); setGlobalError(""); setGlobalMessage("");
+    try { const response=await fetch("/api/etsy/global-prices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({variationKey:v.key,price:value,confirm:true})}); const data=await response.json(); if(!response.ok) throw new Error(data.error||"Toplu güncelleme başarısız."); setGlobalMessage(`Başarılı: ${data.listings_changed} listing güncellendi.`); }
+    catch(err){setGlobalError(err.message||"Toplu güncelleme başarısız.");} finally{setGlobalLoading(false);}
+  }
 
   async function loadPrices() {
     const id = priceListingId.trim();
@@ -315,35 +334,19 @@ export default function Home() {
 
       {connected && (
         <section style={{ ...styles.card, marginTop: 18 }}>
-          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 22 }}>Fiyat Yönetimi</h2>
-          <p style={{ color: "#6b7280", lineHeight: 1.6, marginTop: 0 }}>
-            Etsy Listing ID gir. Ürünün tüm ölçü/varyasyonları mevcut fiyatlarıyla açılır. Yalnız değiştirdiğin satır Etsy’ye gönderilir.
-          </p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}>
-            <input value={priceListingId} onChange={(e)=>setPriceListingId(e.target.value)} placeholder="Etsy Listing ID" inputMode="numeric" style={styles.input}/>
-            <button type="button" onClick={loadPrices} disabled={priceLoading} style={{...styles.button,width:"auto",minWidth:130,opacity:priceLoading?.6:1}}>{priceLoading?"Yükleniyor…":"Fiyatları Aç"}</button>
-          </div>
-          {priceInventory && (
-            <div style={{marginTop:18}}>
-              <div style={{fontWeight:700,marginBottom:4}}>{priceInventory.listing?.title}</div>
-              <div style={{fontSize:12,color:"#6b7280",marginBottom:14}}>Listing #{priceInventory.listing?.listing_id}</div>
-              <div style={{display:"grid",gap:10}}>
-                {(priceInventory.products||[]).map((product)=>{
-                  const key=String(product.product_id); const current=product.offerings?.[0]?.price;
-                  return <div key={key} style={{border:"1px solid #e5e7eb",borderRadius:12,padding:14}}>
-                    <div style={{fontWeight:700,fontSize:14,lineHeight:1.5}}>{propertyLabel(product)}</div>
-                    <div style={{fontSize:13,color:"#6b7280",margin:"5px 0 10px"}}>Mevcut fiyat: <strong>{current}</strong> · Product #{key}</div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:8}}>
-                      <input type="number" min="0.01" step="0.01" placeholder="Yeni fiyat" value={priceInputs[key]||""} onChange={(e)=>setPriceInputs(v=>({...v,[key]:e.target.value}))} style={styles.input}/>
-                      <button type="button" onClick={()=>savePrice(product)} disabled={priceLoading} style={{...styles.button,width:"auto",background:"#8a6b20"}}>Bu Fiyatı Güncelle</button>
-                    </div>
-                  </div>
-                })}
-              </div>
-            </div>
-          )}
-          {priceMessage && <div style={{marginTop:14,padding:12,borderRadius:10,background:"#ecfdf5",color:"#166534"}}>{priceMessage}</div>}
-          {priceError && <div style={{marginTop:14,padding:12,borderRadius:10,background:"#fef2f2",color:"#991b1b"}}>{priceError}</div>}
+          <h2 style={{marginTop:0,marginBottom:8,fontSize:22}}>Global Varyasyon Fiyatları</h2>
+          <p style={{color:"#6b7280",lineHeight:1.6,marginTop:0}}>Tüm aktif VAELONS listinglerini tara. Aynı varyasyonu bir kez fiyatlandır ve bütün eşleşen listinglere uygula.</p>
+          <button type="button" onClick={scanGlobalPrices} disabled={globalLoading} style={{...styles.button,opacity:globalLoading?.6:1}}>{globalLoading?"VAELONS taranıyor…":"Tüm Aktif Listingleri Tara"}</button>
+          {globalVariations.length>0&&<div style={{marginTop:16}}>
+            <div style={{fontSize:13,color:"#6b7280",marginBottom:12}}><strong>{globalListingCount}</strong> aktif listing · <strong>{globalVariations.length}</strong> varyasyon</div>
+            <div style={{display:"grid",gap:10}}>{globalVariations.map(v=><div key={v.key} style={{border:"1px solid #e5e7eb",borderRadius:12,padding:14}}>
+              <div style={{fontWeight:700,lineHeight:1.5}}>{v.label}</div>
+              <div style={{fontSize:13,color:"#6b7280",margin:"5px 0 10px"}}>{v.listing_count} listing · Mevcut: {Object.entries(v.prices||{}).map(([p,n])=>`${p} (${n})`).join(" · ")}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:8}}><input type="number" min="0.01" step="0.01" placeholder="Yeni fiyat" value={globalPrices[v.key]||""} onChange={e=>setGlobalPrices(x=>({...x,[v.key]:e.target.value}))} style={styles.input}/><button type="button" onClick={()=>applyGlobalPrice(v)} disabled={globalLoading} style={{...styles.button,width:"auto",background:"#8a6b20"}}>Tümüne Uygula</button></div>
+            </div>)}</div>
+          </div>}
+          {globalMessage&&<div style={{marginTop:14,padding:12,borderRadius:10,background:"#ecfdf5",color:"#166534"}}>{globalMessage}</div>}
+          {globalError&&<div style={{marginTop:14,padding:12,borderRadius:10,background:"#fef2f2",color:"#991b1b"}}>{globalError}</div>}
         </section>
       )}
 
