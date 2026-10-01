@@ -5,6 +5,7 @@ on:
     branches:
       - plugin-oauth-v1
       - main
+      - hardening/render-production-verification
   workflow_dispatch:
 
 jobs:
