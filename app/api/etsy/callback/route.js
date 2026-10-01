@@ -53,7 +53,7 @@ export async function GET(request) {
       refreshCookieName = "papernexa_refresh_token";
       encryptRefresh = true;
     } else {
-      apiKey = process.env.ETSY_API_KEY || request.cookies.get("etsy_api_key")?.value;
+      apiKey = process.env.ETSY_API_KEY;
       expectedShopName = process.env.ETSY_EXPECTED_SHOP_NAME?.trim().toLowerCase();
       redirectTarget = pluginOauthPending
         ? `${canonicalOrigin}/api/plugin/oauth/authorize?resume=1`
@@ -63,7 +63,7 @@ export async function GET(request) {
 
     const keystring = apiKey?.split(":")[0];
     if (!apiKey || !keystring) {
-      return NextResponse.json({ error: "Etsy API anahtarı eksik." }, { status: 500 });
+      return NextResponse.json({ error: "Etsy sunucu bağlantısı henüz yapılandırılmadı." }, { status: 500 });
     }
 
     const redirectUri = `${canonicalOrigin}/api/etsy/callback`;
