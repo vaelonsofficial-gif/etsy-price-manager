@@ -35,6 +35,10 @@ export default function Home() {
   const [globalLoading, setGlobalLoading] = useState(false);
   const [globalMessage, setGlobalMessage] = useState("");
   const [globalError, setGlobalError] = useState("");
+  const [apiKeyConfigured, setApiKeyConfigured] = useState(null);
+  const [etsyApiKey, setEtsyApiKey] = useState("");
+  const [apiKeySaving, setApiKeySaving] = useState(false);
+  const [apiKeyError, setApiKeyError] = useState("");
 
   const timezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Yerel saat",
@@ -70,7 +74,44 @@ export default function Home() {
     }
   }
 
+  async function loadApiKeyStatus() {
+    try {
+      const response = await fetch("/api/etsy/key", { cache: "no-store" });
+      const data = await response.json();
+      setApiKeyConfigured(Boolean(data?.configured));
+    } catch {
+      setApiKeyConfigured(false);
+    }
+  }
+
+  async function saveEtsyApiKey(event) {
+    event.preventDefault();
+    const value = etsyApiKey.trim();
+    if (!value || !value.includes(":")) {
+      setApiKeyError("Etsy API anahtarını keystring:shared_secret biçiminde gir.");
+      return;
+    }
+    setApiKeySaving(true);
+    setApiKeyError("");
+    try {
+      const response = await fetch("/api/etsy/key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: value }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "API anahtarı kaydedilemedi.");
+      setEtsyApiKey("");
+      setApiKeyConfigured(true);
+      window.location.assign("/api/etsy/login");
+    } catch (error) {
+      setApiKeyError(error?.message || "API anahtarı kaydedilemedi.");
+      setApiKeySaving(false);
+    }
+  }
+
   useEffect(() => {
+    loadApiKeyStatus();
     loadDrafts();
   }, []);
 
@@ -251,12 +292,40 @@ export default function Home() {
         ) : !connected ? (
           <div>
             <h2 style={{ marginTop: 0 }}>Etsy bağlantısı gerekli</h2>
-            <p style={{ color: "#6b7280", lineHeight: 1.6 }}>
-              VAELONS hesabını bir kez bağla. Token ekranda gösterilmez; güvenli HttpOnly oturumunda tutulur.
-            </p>
-            <a href="/api/etsy/login" style={{ ...styles.button, display: "block", textAlign: "center", textDecoration: "none", boxSizing: "border-box" }}>
-              VAELONS Etsy Hesabını Bağla
-            </a>
+            {apiKeyConfigured === null ? (
+              <p style={{ color: "#6b7280", lineHeight: 1.6 }}>API anahtarı kontrol ediliyor…</p>
+            ) : apiKeyConfigured ? (
+              <>
+                <p style={{ color: "#6b7280", lineHeight: 1.6 }}>
+                  API anahtarı güvenli oturumda hazır. VAELONS hesabını bağlayarak devam et.
+                </p>
+                <a href="/api/etsy/login" style={{ ...styles.button, display: "block", textAlign: "center", textDecoration: "none", boxSizing: "border-box" }}>
+                  VAELONS Etsy Hesabını Bağla
+                </a>
+              </>
+            ) : (
+              <form onSubmit={saveEtsyApiKey}>
+                <p style={{ color: "#6b7280", lineHeight: 1.6 }}>
+                  Etsy Manage Apps ekranındaki <strong>keystring:shared_secret</strong> değerini bir kez gir. Anahtar ekranda tekrar gösterilmez ve HttpOnly/Secure oturumunda saklanır.
+                </p>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  placeholder="keystring:shared_secret"
+                  value={etsyApiKey}
+                  onChange={(event) => setEtsyApiKey(event.target.value)}
+                  style={{ ...styles.input, marginBottom: 10 }}
+                />
+                <button type="submit" disabled={apiKeySaving} style={{ ...styles.button, opacity: apiKeySaving ? 0.6 : 1 }}>
+                  {apiKeySaving ? "Güvenli kaydediliyor…" : "API Anahtarını Kaydet ve Etsy'ye Bağlan"}
+                </button>
+                {apiKeyError && (
+                  <div style={{ marginTop: 12, padding: 11, borderRadius: 9, background: "#fef2f2", color: "#991b1b", fontSize: 13 }}>
+                    {apiKeyError}
+                  </div>
+                )}
+              </form>
+            )}
           </div>
         ) : (
           <div>

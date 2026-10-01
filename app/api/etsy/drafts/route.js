@@ -8,6 +8,7 @@ export async function GET() {
   try {
     const cookieStore = await cookies();
     const refreshToken = cookieStore.get("etsy_refresh_token")?.value;
+    const apiKey = cookieStore.get("etsy_api_key")?.value;
 
     if (!refreshToken) {
       return NextResponse.json(
@@ -16,7 +17,7 @@ export async function GET() {
       );
     }
 
-    const data = await listDraftListings(refreshToken);
+    const data = await listDraftListings(refreshToken, apiKey);
     return NextResponse.json({ connected: true, ...data });
   } catch (error) {
     return NextResponse.json(
