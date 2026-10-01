@@ -5,8 +5,9 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   return NextResponse.json({
     ok: true,
-    configured: Boolean(process.env.ETSY_API_KEY),
-    mode: "server-only",
+    configured: Boolean(process.env.ETSY_API_KEY || (process.env.ETSY_BRIDGE_URL && process.env.VAELONS_BRIDGE_TOKEN)),
+    bridge_configured: Boolean(process.env.ETSY_BRIDGE_URL && process.env.VAELONS_BRIDGE_TOKEN),
+    mode: process.env.ETSY_BRIDGE_URL && process.env.VAELONS_BRIDGE_TOKEN ? "seller-bridge" : "server-only",
     user_input_required: false,
   });
 }
