@@ -11,7 +11,7 @@ function normalizeShopPayload(payload) {
 export async function GET(request) {
   try {
     const url = new URL(request.url);
-    const canonicalOrigin = process.env.PUBLIC_APP_URL || "https://vaelons-etsy-price-manager.onrender.com";
+    const canonicalOrigin = "https://etsy-price-manager.vercel.app";
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
     const savedState = request.cookies.get("etsy_oauth_state")?.value;
