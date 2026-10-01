@@ -1,0 +1,14 @@
+name: OAuth callback diagnostic
+on:
+  push:
+    paths:
+      - ".github/workflows/oauth-diagnose.yml"
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Render OAuth diagnostics
+        run: |
+          curl -fsSL --max-time 60 https://vaelons-etsy-price-manager.onrender.com/api/etsy/oauth-diagnose
