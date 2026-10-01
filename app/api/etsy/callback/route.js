@@ -20,7 +20,12 @@ export async function GET(request) {
     const pluginOauthPending = request.cookies.get("plugin_oauth_pending")?.value || "";
 
     if (!code) {
-      return NextResponse.json({ error: "OAuth code bulunamadı." }, { status: 400 });
+      const oauthError = url.searchParams.get("error");
+      const oauthErrorDescription = url.searchParams.get("error_description");
+      if (oauthError) {
+        return NextResponse.redirect(`${canonicalOrigin}/?etsy=error&reason=${encodeURIComponent(oauthErrorDescription || oauthError)}`);
+      }
+      return NextResponse.redirect(`${canonicalOrigin}/api/etsy/login`);
     }
 
     if (!state || !savedState || state !== savedState) {
