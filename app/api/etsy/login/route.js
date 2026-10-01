@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 export async function GET(request) {
   const apiKey = process.env.ETSY_API_KEY;
   const keystring = apiKey?.split(":")[0];
-  const canonicalOrigin = process.env.PUBLIC_APP_URL || "https://vaelons-etsy-price-manager.onrender.com";
+  const canonicalOrigin = "https://etsy-price-manager.vercel.app";
   const redirectUri = `${canonicalOrigin}/api/etsy/callback`;
 
   if (!keystring) {
