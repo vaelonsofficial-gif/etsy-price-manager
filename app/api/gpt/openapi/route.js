@@ -5,9 +5,9 @@ export async function GET() {
     openapi: "3.1.0",
     info: {
       title: "VAELONS Etsy Manager Action API",
-      version: "1.0.2",
+      version: "1.1.0",
       description:
-        "Lists VAELONS Etsy draft listings and schedules one or more drafts for future publication. This API does not edit listing title, SEO, tags, description, price, images, stock, shipping, or variations.",
+        "Lists VAELONS Etsy drafts, schedules publication, reads listing variation prices, and updates only explicitly selected product variation prices after confirmation. It does not edit title, SEO, tags, description, images, stock, shipping, or variation definitions.",
     },
     servers: [{ url: "https://etsy-price-manager.vercel.app" }],
     components: {
@@ -53,6 +53,10 @@ export async function GET() {
     },
     security: [{ bearerAuth: [] }],
     paths: {
+      "/api/gpt/prices": {
+        get: { operationId: "getVaelonsListingPrices", summary: "Read all current variation prices for one VAELONS listing", parameters: [{ name: "listingId", in: "query", required: true, schema: { type: "string" } }], responses: { "200": { description: "Listing inventory and prices" } } },
+        post: { operationId: "updateVaelonsSelectedPrices", summary: "Update only explicitly selected VAELONS variation prices", description: "Call GET first. Never infer productId. POST only after the user has specified the intended item/variation and price.", requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: false, required: ["listingId","updates","confirm"], properties: { listingId: { type: "string" }, confirm: { type: "boolean", const: true }, updates: { type: "array", minItems: 1, items: { type: "object", additionalProperties: false, required: ["productId","price"], properties: { productId: { type: "string" }, price: { type: "number", exclusiveMinimum: 0 } } } } } } } }, responses: { "200": { description: "Only selected prices updated" } } }
+      },
       "/api/gpt/drafts": {
         get: {
           operationId: "listVaelonsDrafts",
