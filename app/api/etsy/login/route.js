@@ -1,16 +1,14 @@
 import crypto from "crypto";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function GET(request) {
-  const store = await cookies();
-  const apiKey = process.env.ETSY_API_KEY || store.get("etsy_api_key")?.value;
+  const apiKey = process.env.ETSY_API_KEY;
   const keystring = apiKey?.split(":")[0];
   const redirectUri = `${new URL(request.url).origin}/api/etsy/callback`;
 
   if (!keystring) {
     return NextResponse.json(
-      { error: "ETSY_API_KEY eksik" },
+      { error: "Etsy sunucu bağlantısı henüz yapılandırılmadı." },
       { status: 500 }
     );
   }
