@@ -36,6 +36,7 @@ export default function Home() {
   const [globalMessage, setGlobalMessage] = useState("");
   const [globalError, setGlobalError] = useState("");
   const [apiKeyConfigured, setApiKeyConfigured] = useState(null);
+  const [bridgeConfigured, setBridgeConfigured] = useState(false);
 
   const timezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Yerel saat",
@@ -76,8 +77,10 @@ export default function Home() {
       const response = await fetch("/api/etsy/key", { cache: "no-store" });
       const data = await response.json();
       setApiKeyConfigured(Boolean(data?.configured));
+      setBridgeConfigured(Boolean(data?.bridge_configured));
     } catch {
       setApiKeyConfigured(false);
+      setBridgeConfigured(false);
     }
   }
 
@@ -296,7 +299,12 @@ export default function Home() {
           <div>
             <h2 style={{ marginTop: 0 }}>Etsy bağlantısı gerekli</h2>
             {apiKeyConfigured === null ? (
-              <p style={{ color: "#6b7280", lineHeight: 1.6 }}>Sunucu Etsy bağlantısı kontrol ediliyor…</p>
+              <p style={{ color: "#6b7280", lineHeight: 1.6 }}>Etsy bağlantı katmanı kontrol ediliyor…</p>
+            ) : bridgeConfigured ? (
+              <div style={{ padding: 14, borderRadius: 10, background: "#ecfdf5", color: "#166534", lineHeight: 1.55 }}>
+                <strong>Seller Bridge hazır.</strong><br />
+                Global varyasyon fiyat yönetimi için keystring veya shared secret girmen gerekmez. Aşağıdaki Global Varyasyon Fiyatları bölümünü doğrudan kullanabilirsin.
+              </div>
             ) : apiKeyConfigured ? (
               <>
                 <p style={{ color: "#6b7280", lineHeight: 1.6 }}>
@@ -308,7 +316,7 @@ export default function Home() {
               </>
             ) : (
               <div style={{ padding: 14, borderRadius: 10, background: "#fff7ed", color: "#9a3412", lineHeight: 1.55 }}>
-                Sunucu Etsy kimliği henüz bağlanmadı. Bu panel kullanıcıdan keystring veya shared secret istemez.
+                Etsy bağlantı katmanı henüz hazır değil. Bu panel kullanıcıdan keystring veya shared secret istemez.
               </div>
             )}
           </div>
@@ -393,9 +401,10 @@ export default function Home() {
       </section>
 
 
-      {connected && (
+      {(connected || bridgeConfigured) && (
         <section style={{ ...styles.card, marginTop: 18 }}>
           <h2 style={{marginTop:0,marginBottom:8,fontSize:22}}>Global Varyasyon Fiyatları</h2>
+          {bridgeConfigured && <div style={{marginBottom:12,padding:10,borderRadius:9,background:"#ecfdf5",color:"#166534",fontSize:13}}>● VAELONS Seller Bridge bağlı · keystring girişi gerekmez</div>}
           <p style={{color:"#6b7280",lineHeight:1.6,marginTop:0}}>Bir referans listingden varyasyonu seç. Mevcut fiyat ne olursa olsun aynı varyasyon tüm aktif listinglerde bulunur ve girdiğin yeni fiyat uygulanır.</p>
           <button type="button" onClick={scanGlobalPrices} disabled={globalLoading} style={{...styles.button,opacity:globalLoading?.6:1}}>{globalLoading?"VAELONS taranıyor…":"Varyasyonları Getir"}</button>
           {globalVariations.length>0&&<div style={{marginTop:16}}>
