@@ -27,7 +27,7 @@ export async function GET(request) {
 
   url.searchParams.set("response_type", "code");
   url.searchParams.set("redirect_uri", redirectUri);
-  url.searchParams.set("scope", "listings_r listings_w");
+  url.searchParams.set("scope", "listings_r listings_w shops_r");
   url.searchParams.set("client_id", keystring);
   url.searchParams.set("state", state);
   url.searchParams.set("code_challenge", codeChallenge);
