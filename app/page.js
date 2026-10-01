@@ -29,6 +29,7 @@ export default function Home() {
   const [priceError, setPriceError] = useState("");
   const [globalVariations, setGlobalVariations] = useState([]);
   const [globalListingCount, setGlobalListingCount] = useState(0);
+  const [referenceListing, setReferenceListing] = useState(null);
   const [globalPrices, setGlobalPrices] = useState({});
   const [globalLoading, setGlobalLoading] = useState(false);
   const [globalMessage, setGlobalMessage] = useState("");
@@ -120,7 +121,7 @@ export default function Home() {
 
   async function scanGlobalPrices() {
     setGlobalLoading(true); setGlobalError(""); setGlobalMessage("");
-    try { const response=await fetch("/api/etsy/global-prices",{cache:"no-store"}); const data=await response.json(); if(!response.ok) throw new Error(data.error||"Varyasyonlar taranamadı."); setGlobalVariations(data.variations||[]); setGlobalListingCount(data.active_listing_count||0); setGlobalMessage(`${data.active_listing_count||0} aktif listing tarandı. ${(data.variations||[]).length} varyasyon bulundu.`); }
+    try { const response=await fetch("/api/etsy/global-prices",{cache:"no-store"}); const data=await response.json(); if(!response.ok) throw new Error(data.error||"Varyasyonlar taranamadı."); setGlobalVariations(data.variations||[]); setReferenceListing(data.reference_listing||null); setGlobalMessage(`Referans listingden ${(data.variations||[]).length} varyasyon getirildi.`); }
     catch(err){setGlobalError(err.message||"Varyasyonlar taranamadı.");} finally{setGlobalLoading(false);}
   }
   async function applyGlobalPrice(v) {
@@ -335,13 +336,13 @@ export default function Home() {
       {connected && (
         <section style={{ ...styles.card, marginTop: 18 }}>
           <h2 style={{marginTop:0,marginBottom:8,fontSize:22}}>Global Varyasyon Fiyatları</h2>
-          <p style={{color:"#6b7280",lineHeight:1.6,marginTop:0}}>Tüm aktif VAELONS listinglerini tara. Aynı varyasyonu bir kez fiyatlandır ve bütün eşleşen listinglere uygula.</p>
-          <button type="button" onClick={scanGlobalPrices} disabled={globalLoading} style={{...styles.button,opacity:globalLoading?.6:1}}>{globalLoading?"VAELONS taranıyor…":"Tüm Aktif Listingleri Tara"}</button>
+          <p style={{color:"#6b7280",lineHeight:1.6,marginTop:0}}>Tek bir VAELONS listingini referans alarak mağaza standart varyasyonlarını getir. Fiyatı bir kez belirle; uygulama onayında aynı varyasyon tüm listinglerde eşleştirilir.</p>
+          <button type="button" onClick={scanGlobalPrices} disabled={globalLoading} style={{...styles.button,opacity:globalLoading?.6:1}}>{globalLoading?"VAELONS taranıyor…":"Varyasyonları Getir"}</button>
           {globalVariations.length>0&&<div style={{marginTop:16}}>
-            <div style={{fontSize:13,color:"#6b7280",marginBottom:12}}><strong>{globalListingCount}</strong> aktif listing · <strong>{globalVariations.length}</strong> varyasyon</div>
+            <div style={{fontSize:13,color:"#6b7280",marginBottom:12}}>Referans: <strong>{referenceListing?.title || "VAELONS listing"}</strong> · <strong>{globalVariations.length}</strong> varyasyon</div>
             <div style={{display:"grid",gap:10}}>{globalVariations.map(v=><div key={v.key} style={{border:"1px solid #e5e7eb",borderRadius:12,padding:14}}>
               <div style={{fontWeight:700,lineHeight:1.5}}>{v.label}</div>
-              <div style={{fontSize:13,color:"#6b7280",margin:"5px 0 10px"}}>{v.listing_count} listing · Mevcut: {Object.entries(v.prices||{}).map(([p,n])=>`${p} (${n})`).join(" · ")}</div>
+              <div style={{fontSize:13,color:"#6b7280",margin:"5px 0 10px"}}>Referans fiyat: {Object.entries(v.prices||{}).map(([p,n])=>`${p} (${n})`).join(" · ")}</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:8}}><input type="number" min="0.01" step="0.01" placeholder="Yeni fiyat" value={globalPrices[v.key]||""} onChange={e=>setGlobalPrices(x=>({...x,[v.key]:e.target.value}))} style={styles.input}/><button type="button" onClick={()=>applyGlobalPrice(v)} disabled={globalLoading} style={{...styles.button,width:"auto",background:"#8a6b20"}}>Tümüne Uygula</button></div>
             </div>)}</div>
           </div>}
