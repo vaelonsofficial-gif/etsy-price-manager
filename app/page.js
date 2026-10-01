@@ -21,6 +21,12 @@ export default function Home() {
   const [gptLoading, setGptLoading] = useState(false);
   const [gptError, setGptError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [priceListingId, setPriceListingId] = useState("");
+  const [priceInventory, setPriceInventory] = useState(null);
+  const [priceInputs, setPriceInputs] = useState({});
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [priceMessage, setPriceMessage] = useState("");
+  const [priceError, setPriceError] = useState("");
 
   const timezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Yerel saat",
@@ -103,6 +109,48 @@ export default function Home() {
     } finally {
       setSchedulingId("");
     }
+  }
+
+
+  async function loadPrices() {
+    const id = priceListingId.trim();
+    if (!id) return setPriceError("Önce Etsy Listing ID gir.");
+    setPriceLoading(true); setPriceError(""); setPriceMessage("");
+    try {
+      const response = await fetch(`/api/etsy/prices?listingId=${encodeURIComponent(id)}`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Fiyatlar alınamadı.");
+      setPriceInventory(data);
+      setPriceInputs({});
+    } catch (err) { setPriceInventory(null); setPriceError(err.message || "Fiyatlar alınamadı."); }
+    finally { setPriceLoading(false); }
+  }
+
+  function propertyLabel(product) {
+    const values = product.property_values || [];
+    if (!values.length) return product.sku || `Product #${product.product_id}`;
+    return values.map((p) => {
+      const vals = p.values || p.value_ids || [];
+      return `${p.property_name || "Varyasyon"}: ${Array.isArray(vals) ? vals.join(", ") : vals}`;
+    }).join(" · ");
+  }
+
+  async function savePrice(product) {
+    const key=String(product.product_id);
+    const value=Number(priceInputs[key]);
+    if (!Number.isFinite(value) || value <= 0) return setPriceError("Geçerli bir yeni fiyat gir.");
+    const old=product.offerings?.[0]?.price;
+    if (!window.confirm(`${propertyLabel(product)} fiyatı ${old} → ${value} olarak değiştirilsin mi? Diğer varyasyonlara dokunulmayacak.`)) return;
+    setPriceLoading(true); setPriceError(""); setPriceMessage("");
+    try {
+      const response=await fetch("/api/etsy/prices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({listingId:priceListingId.trim(),updates:[{productId:key,price:value}],confirm:true})});
+      const data=await response.json();
+      if(!response.ok) throw new Error(data.error||"Fiyat güncellenemedi.");
+      setPriceMessage(`Fiyat güncellendi: ${old} → ${value}. Etsy inventory yeniden yükleniyor…`);
+      await loadPrices();
+      setPriceMessage(`Başarılı: yalnız seçilen varyasyon ${old} → ${value} olarak güncellendi.`);
+    } catch(err){setPriceError(err.message||"Fiyat güncellenemedi.");}
+    finally{setPriceLoading(false);}
   }
 
   async function generateGptKey() {
@@ -263,6 +311,41 @@ export default function Home() {
           </div>
         )}
       </section>
+
+
+      {connected && (
+        <section style={{ ...styles.card, marginTop: 18 }}>
+          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 22 }}>Fiyat Yönetimi</h2>
+          <p style={{ color: "#6b7280", lineHeight: 1.6, marginTop: 0 }}>
+            Etsy Listing ID gir. Ürünün tüm ölçü/varyasyonları mevcut fiyatlarıyla açılır. Yalnız değiştirdiğin satır Etsy’ye gönderilir.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}>
+            <input value={priceListingId} onChange={(e)=>setPriceListingId(e.target.value)} placeholder="Etsy Listing ID" inputMode="numeric" style={styles.input}/>
+            <button type="button" onClick={loadPrices} disabled={priceLoading} style={{...styles.button,width:"auto",minWidth:130,opacity:priceLoading?.6:1}}>{priceLoading?"Yükleniyor…":"Fiyatları Aç"}</button>
+          </div>
+          {priceInventory && (
+            <div style={{marginTop:18}}>
+              <div style={{fontWeight:700,marginBottom:4}}>{priceInventory.listing?.title}</div>
+              <div style={{fontSize:12,color:"#6b7280",marginBottom:14}}>Listing #{priceInventory.listing?.listing_id}</div>
+              <div style={{display:"grid",gap:10}}>
+                {(priceInventory.products||[]).map((product)=>{
+                  const key=String(product.product_id); const current=product.offerings?.[0]?.price;
+                  return <div key={key} style={{border:"1px solid #e5e7eb",borderRadius:12,padding:14}}>
+                    <div style={{fontWeight:700,fontSize:14,lineHeight:1.5}}>{propertyLabel(product)}</div>
+                    <div style={{fontSize:13,color:"#6b7280",margin:"5px 0 10px"}}>Mevcut fiyat: <strong>{current}</strong> · Product #{key}</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:8}}>
+                      <input type="number" min="0.01" step="0.01" placeholder="Yeni fiyat" value={priceInputs[key]||""} onChange={(e)=>setPriceInputs(v=>({...v,[key]:e.target.value}))} style={styles.input}/>
+                      <button type="button" onClick={()=>savePrice(product)} disabled={priceLoading} style={{...styles.button,width:"auto",background:"#8a6b20"}}>Bu Fiyatı Güncelle</button>
+                    </div>
+                  </div>
+                })}
+              </div>
+            </div>
+          )}
+          {priceMessage && <div style={{marginTop:14,padding:12,borderRadius:10,background:"#ecfdf5",color:"#166534"}}>{priceMessage}</div>}
+          {priceError && <div style={{marginTop:14,padding:12,borderRadius:10,background:"#fef2f2",color:"#991b1b"}}>{priceError}</div>}
+        </section>
+      )}
 
       {connected && (
         <section style={{ ...styles.card, marginTop: 18 }}>
