@@ -54,8 +54,8 @@ export default function Home() {
         return;
       }
 
-      const listings = data.listings || [];
-      setConnected(true);
+      const listings = Array.isArray(data.listings) ? data.listings : [];
+      setConnected(data?.connected !== false);
       setDrafts(listings);
       setScheduleTimes((current) => {
         const next = { ...current };
@@ -86,6 +86,13 @@ export default function Home() {
 
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("etsy") === "connected") {
+      setConnected(true);
+      setLoading(false);
+      try { sessionStorage.removeItem("vaelons_etsy_oauth_started"); } catch {}
+    }
+
     loadApiKeyStatus();
     loadDrafts();
   }, []);
@@ -309,6 +316,17 @@ export default function Home() {
         <p style={{ margin: 0, color: "#6b7280", lineHeight: 1.6 }}>
           Her taslak ürün için ayrı yayınlama tarihi ve saati belirle. Manager zamanı geldiğinde Etsy’de otomatik yayınlar.
         </p>
+      </div>
+
+      <div style={{
+        marginBottom: 16,
+        padding: "12px 14px",
+        borderRadius: 10,
+        fontWeight: 700,
+        background: connected === true ? "#ecfdf5" : "#f9fafb",
+        color: connected === true ? "#166534" : "#6b7280"
+      }}>
+        {connected === true ? "● Etsy bağlı" : connected === false ? "○ Etsy bağlantısı gerekli" : "Etsy bağlantısı kontrol ediliyor…"}
       </div>
 
       <section style={styles.card}>
