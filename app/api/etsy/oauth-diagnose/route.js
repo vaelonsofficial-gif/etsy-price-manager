@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
+// deploy-trigger-2
 
 function challenge() {
   const verifier = crypto.randomBytes(32).toString("base64url");
