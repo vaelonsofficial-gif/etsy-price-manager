@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+// Canonical production host: Vercel.
 const CANONICAL_ORIGIN = "https://etsy-price-manager.vercel.app";
 
 export function middleware(request) {
