@@ -5,6 +5,7 @@ on:
     branches:
       - plugin-oauth-v1
       - main
+      - fix/variation-subset-match
   workflow_dispatch:
 
 jobs:
