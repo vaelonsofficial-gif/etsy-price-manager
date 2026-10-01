@@ -30,6 +30,7 @@ export default function Home() {
   const [globalVariations, setGlobalVariations] = useState([]);
   const [globalListingCount, setGlobalListingCount] = useState(0);
   const [referenceListing, setReferenceListing] = useState(null);
+  const [variationSearch, setVariationSearch] = useState("");
   const [globalPrices, setGlobalPrices] = useState({});
   const [globalLoading, setGlobalLoading] = useState(false);
   const [globalMessage, setGlobalMessage] = useState("");
@@ -339,8 +340,8 @@ export default function Home() {
           <p style={{color:"#6b7280",lineHeight:1.6,marginTop:0}}>Tek bir VAELONS listingini referans alarak mağaza standart varyasyonlarını getir. Fiyatı bir kez belirle; uygulama onayında aynı varyasyon tüm listinglerde eşleştirilir.</p>
           <button type="button" onClick={scanGlobalPrices} disabled={globalLoading} style={{...styles.button,opacity:globalLoading?.6:1}}>{globalLoading?"VAELONS taranıyor…":"Varyasyonları Getir"}</button>
           {globalVariations.length>0&&<div style={{marginTop:16}}>
-            <div style={{fontSize:13,color:"#6b7280",marginBottom:12}}>Referans: <strong>{referenceListing?.title || "VAELONS listing"}</strong> · <strong>{globalVariations.length}</strong> varyasyon</div>
-            <div style={{display:"grid",gap:10}}>{globalVariations.map(v=><div key={v.key} style={{border:"1px solid #e5e7eb",borderRadius:12,padding:14}}>
+            <div style={{fontSize:13,color:"#6b7280",marginBottom:12}}>Referans: <strong>{referenceListing?.title || "VAELONS listing"}</strong> · <strong>{globalVariations.length}</strong> varyasyon</div><input type="search" placeholder="Varyasyon ara: rolled, canvas, 13×18..." value={variationSearch} onChange={e=>setVariationSearch(e.target.value)} style={{...styles.input,marginBottom:12}} />
+            <div style={{display:"grid",gap:10}}>{globalVariations.filter(v => `${v.label} ${v.key}`.toLocaleLowerCase("tr-TR").includes(variationSearch.trim().toLocaleLowerCase("tr-TR"))).map(v=><div key={v.key} style={{border:"1px solid #e5e7eb",borderRadius:12,padding:14}}>
               <div style={{fontWeight:700,lineHeight:1.5}}>{v.label}</div>
               <div style={{fontSize:13,color:"#6b7280",margin:"5px 0 10px"}}>Referans fiyat: {Object.entries(v.prices||{}).map(([p,n])=>`${p} (${n})`).join(" · ")}</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:8}}><input type="number" min="0.01" step="0.01" placeholder="Yeni fiyat" value={globalPrices[v.key]||""} onChange={e=>setGlobalPrices(x=>({...x,[v.key]:e.target.value}))} style={styles.input}/><button type="button" onClick={()=>applyGlobalPrice(v)} disabled={globalLoading} style={{...styles.button,width:"auto",background:"#8a6b20"}}>Tümüne Uygula</button></div>
