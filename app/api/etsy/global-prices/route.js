@@ -28,7 +28,7 @@ export async function POST(request) {
     const { refreshToken, apiKey } = await auth();
     if (body?.preview === true) return NextResponse.json(await previewGlobalVariationPrice({ variationKey: body.variationKey, refreshToken, apiKey }));
     if (body?.confirm !== true) return NextResponse.json({ error: "Önizleme veya confirm=true gerekli." }, { status: 400 });
-    return NextResponse.json(await applyGlobalVariationPrice({ variationKey: body.variationKey, price: body.price, refreshToken, apiKey }));
+    return NextResponse.json(await applyGlobalVariationPrice({ variationKey: body.variationKey, price: body.price, refreshToken, apiKey, listingIds: body.listingIds }));
   } catch (e) {
     return NextResponse.json({ error: e.message, details: e.details || null }, { status: e.status || 500 });
   }
