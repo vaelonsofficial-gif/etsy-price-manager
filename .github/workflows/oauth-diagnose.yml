@@ -9,6 +9,57 @@ jobs:
   diagnose:
     runs-on: ubuntu-latest
     steps:
-      - name: Check Render OAuth diagnostics
+      - name: Probe Etsy registered redirects
         run: |
-          curl -fsSL --max-time 60 https://vaelons-etsy-price-manager.onrender.com/api/etsy/oauth-diagnose
+          python - <<'PY'
+          import urllib.parse, urllib.request, urllib.error
+
+          clients = [
+              ("manager", "5qr145iovas0vb9zipty5rpi"),
+              ("current_app", "w120t5sv1zpxrzpkba2e0re0"),
+          ]
+          redirects = [
+              "https://etsy-price-manager.vercel.app/api/etsy/callback",
+              "https://vaelons-etsy-price-manager.onrender.com/api/etsy/callback",
+              "https://vaelons-etsy-seller-bridge.vercel.app/oauth/etsy/callback",
+              "https://vaelons-etsy-seller-bridge-x2bh.vercel.app/oauth/etsy/callback",
+              "https://papernexa-studio.bekirebru07.chatgpt.site/api/etsy?step=callback",
+          ]
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+
+          opener = urllib.request.build_opener(NoRedirect)
+
+          for label, client_id in clients:
+              print("\n=== CLIENT", label, client_id, "===")
+              for redirect_uri in redirects:
+                  params = {
+                      "response_type": "code",
+                      "redirect_uri": redirect_uri,
+                      "scope": "listings_r listings_w",
+                      "client_id": client_id,
+                      "state": "diagnostic-state",
+                      "code_challenge": "A" * 43,
+                      "code_challenge_method": "S256",
+                  }
+                  url = "https://www.etsy.com/oauth/connect?" + urllib.parse.urlencode(params)
+                  req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                  try:
+                      res = opener.open(req, timeout=12)
+                      body = res.read(500).decode("utf-8", "replace")
+                      print("URI", redirect_uri)
+                      print("STATUS", res.status)
+                      print("LOCATION", res.headers.get("Location"))
+                      print("BODY", " ".join(body.split())[:300])
+                  except urllib.error.HTTPError as e:
+                      body = e.read(500).decode("utf-8", "replace")
+                      print("URI", redirect_uri)
+                      print("STATUS", e.code)
+                      print("LOCATION", e.headers.get("Location"))
+                      print("BODY", " ".join(body.split())[:300])
+                  except Exception as e:
+                      print("URI", redirect_uri)
+                      print("ERROR", type(e).__name__, str(e))
+          PY
