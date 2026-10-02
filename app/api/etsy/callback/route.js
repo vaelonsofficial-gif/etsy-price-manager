@@ -11,7 +11,9 @@ function normalizeShopPayload(payload) {
 export async function GET(request) {
   try {
     const url = new URL(request.url);
-    const canonicalOrigin = "https://etsy-price-manager.vercel.app";
+    const forwardedProto = request.headers.get("x-forwarded-proto") || url.protocol.replace(":", "") || "https";
+    const forwardedHost = request.headers.get("x-forwarded-host") || request.headers.get("host") || url.host;
+    const canonicalOrigin = `${forwardedProto}://${forwardedHost}`;
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
     const savedState = request.cookies.get("etsy_oauth_state")?.value;
