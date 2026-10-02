@@ -1,10 +1,17 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 
+function requestOrigin(request) {
+  const url = new URL(request.url);
+  const proto = request.headers.get("x-forwarded-proto") || url.protocol.replace(":", "") || "https";
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || url.host;
+  return `${proto}://${host}`;
+}
+
 export async function GET(request) {
   const apiKey = process.env.ETSY_API_KEY;
   const keystring = apiKey?.split(":")[0];
-  const canonicalOrigin = "https://etsy-price-manager.vercel.app";
+  const canonicalOrigin = requestOrigin(request);
   const redirectUri = `${canonicalOrigin}/api/etsy/callback`;
 
   if (!keystring) {
@@ -15,14 +22,8 @@ export async function GET(request) {
   }
 
   const codeVerifier = crypto.randomBytes(32).toString("base64url");
-
-  const codeChallenge = crypto
-    .createHash("sha256")
-    .update(codeVerifier)
-    .digest("base64url");
-
+  const codeChallenge = crypto.createHash("sha256").update(codeVerifier).digest("base64url");
   const state = crypto.randomBytes(16).toString("hex");
-
   const url = new URL("https://www.etsy.com/oauth/connect");
 
   url.searchParams.set("response_type", "code");
@@ -34,22 +35,8 @@ export async function GET(request) {
   url.searchParams.set("code_challenge_method", "S256");
 
   const response = NextResponse.redirect(url);
-
-  response.cookies.set("etsy_code_verifier", codeVerifier, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    maxAge: 600,
-    path: "/",
-  });
-
-  response.cookies.set("etsy_oauth_state", state, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    maxAge: 600,
-    path: "/",
-  });
-
+  const cookieOptions = { httpOnly: true, secure: true, sameSite: "lax", maxAge: 600, path: "/" };
+  response.cookies.set("etsy_code_verifier", codeVerifier, cookieOptions);
+  response.cookies.set("etsy_oauth_state", state, cookieOptions);
   return response;
 }
