@@ -1,17 +1,10 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 
-function requestOrigin(request) {
-  const url = new URL(request.url);
-  const proto = request.headers.get("x-forwarded-proto") || url.protocol.replace(":", "") || "https";
-  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || url.host;
-  return `${proto}://${host}`;
-}
-
 export async function GET(request) {
   const apiKey = process.env.ETSY_API_KEY;
   const keystring = apiKey?.split(":")[0];
-  const canonicalOrigin = requestOrigin(request);
+  const canonicalOrigin = "https://etsy-price-manager.vercel.app";
   const redirectUri = `${canonicalOrigin}/api/etsy/callback`;
 
   if (!keystring) {
