@@ -78,7 +78,11 @@ export async function GET() {
         variations: (data?.variations || []).map((item) => ({
           key: item.key,
           label: item.label,
-          reference_product_id: item.referenceProductId
+          reference_product_id: item.referenceProductId,
+          current_price:
+            Number.isFinite(Number(item.currentPrice))
+              ? Number(item.currentPrice)
+              : null
         })),
         connection_mode: "seller-bridge"
       });
