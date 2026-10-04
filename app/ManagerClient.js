@@ -526,7 +526,7 @@ export default function ManagerClient({ initialConnected = false }) {
             <div style={{fontSize:13,color:"#6b7280",marginBottom:12}}>Referans: <strong>{referenceListing?.title || "VAELONS listing"}</strong> · <strong>{globalVariations.length}</strong> varyasyon · <strong>{globalListingCount}</strong> aktif listing</div><input type="search" placeholder="Varyasyon ara: rolled, canvas, 13×18..." value={variationSearch} onChange={e=>setVariationSearch(e.target.value)} style={{...styles.input,marginBottom:12}} />
             <div style={{display:"grid",gap:10}}>{globalVariations.filter(v => `${v.label} ${v.key}`.toLocaleLowerCase("tr-TR").includes(variationSearch.trim().toLocaleLowerCase("tr-TR"))).map(v=><div key={v.key} style={{border:"1px solid #e5e7eb",borderRadius:12,padding:14}}>
               <div style={{fontWeight:700,lineHeight:1.5}}>{v.label}</div>
-              <div style={{fontSize:13,color:"#6b7280",margin:"5px 0 10px"}}>Mevcut referans fiyat: <strong>{Number(v.current_price)>0?`${Number(v.current_price).toFixed(2)}`:"okunamadı"}</strong></div>
+              <div style={{fontSize:13,color:"#6b7280",margin:"5px 0 10px"}}>VAELONS mevcut fiyatı: <strong>{Number(v.current_price)>0?<><span>$</span>{Number(v.current_price).toFixed(2)}</>:"okunamadı"}</strong></div>
               <button type="button" onClick={()=>analyzeMarketPrice(v)} disabled={marketLoadingKey===v.key||globalLoading} style={{...styles.button,marginBottom:10,background:"#1f4e78",opacity:marketLoadingKey===v.key?.6:1}}>{marketLoadingKey===v.key?"Etsy piyasası taranıyor…":"Piyasayı Tara ve Öneri Al"}</button>
               {marketErrorKey===v.key&&marketError&&<div style={{marginBottom:10,padding:10,borderRadius:9,background:"#fef2f2",color:"#991b1b",fontSize:13,lineHeight:1.5}}>{marketError}</div>}
               {marketAnalyses[v.key]&&(()=>{
@@ -536,7 +536,7 @@ export default function ManagerClient({ initialConnected = false }) {
                 const c=a.cost||{};
                 return <div style={{marginBottom:10,padding:12,borderRadius:10,background:"#f8fafc",fontSize:13,lineHeight:1.65}}>
                   <div><strong>Maliyet:</strong> ${Number(c.cost_usd||0).toFixed(2)} <span style={{color:"#6b7280"}}>({c.confidence==="confirmed"?"doğrulandı":"Excel"})</span></div>
-                  <div><strong>Etsy piyasa referansı:</strong> {Number(m.reference_price)>0?`${Number(m.reference_price).toFixed(2)}`:"yetersiz veri"} · {m.exact_reference_count||0} tam varyasyon referansı · güven {m.confidence||"LOW"}</div>
+                  <div><strong>Etsy piyasa referansı:</strong> {Number(m.reference_price)>0?<><span>$</span>{Number(m.reference_price).toFixed(2)}</>:"yetersiz veri"} · {m.exact_reference_count||0} tam varyasyon referansı · güven {m.confidence||"LOW"}</div>
                   <div><strong>Min. kâr tabanı:</strong> ${Number(rec.profit_floor_price||0).toFixed(2)}</div>
                   <div><strong>Önerilen fiyat:</strong> <span style={{fontSize:16,fontWeight:800,color:"#166534"}}>${Number(rec.next_price||0).toFixed(2)}</span></div>
                   <div><strong>Değişim:</strong> {Number(rec.change_pct||0)>=0?"+":""}{Number(rec.change_pct||0).toFixed(2)}% · tahmini kâr marjı %{Number(rec.estimated_margin_pct||0).toFixed(2)}</div>
