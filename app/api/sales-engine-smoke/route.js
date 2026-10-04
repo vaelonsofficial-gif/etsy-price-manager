@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 export async function GET() {
-  const baseUrl = String(process.env.ETSY_BRIDGE_URL || "").replace(/\/$/, "");
+  const baseUrl = "https://vaelons-etsy-seller-bridge-3dql-qn8qjy3vp.vercel.app";
   const token = String(process.env.VAELONS_BRIDGE_TOKEN || "").trim();
 
   if (!baseUrl || !token) {
