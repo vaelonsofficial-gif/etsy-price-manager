@@ -531,7 +531,7 @@ export default function ManagerClient({ initialConnected = false }) {
             <div style={{display:"grid",gap:10}}>{globalVariations.filter(v => `${v.label} ${v.key}`.toLocaleLowerCase("tr-TR").includes(variationSearch.trim().toLocaleLowerCase("tr-TR"))).map(v=><div key={v.key} style={{border:"1px solid #e5e7eb",borderRadius:12,padding:14}}>
               <div style={{fontWeight:700,lineHeight:1.5}}>{v.label}</div>
               <div style={{fontSize:13,color:"#6b7280",margin:"5px 0 10px"}}>VAELONS mevcut fiyatı: <strong>{Number(v.current_price)>0?<><span>$</span>{Number(v.current_price).toFixed(2)}</>:"okunamadı"}</strong></div>
-              <button type="button" onClick={()=>analyzeMarketPrice(v)} disabled={marketLoadingKey===v.key||globalLoading} style={{...styles.button,marginBottom:10,background:"#1f4e78",opacity:marketLoadingKey===v.key?.6:1}}>{marketLoadingKey===v.key?"Etsy piyasası taranıyor…":"Piyasayı Tara ve Öneri Al"}</button>
+              <button type="button" onClick={()=>analyzeMarketPrice(v)} disabled={marketLoadingKey===v.key||globalLoading} style={{...styles.button,marginBottom:10,background:"#1f4e78",opacity:marketLoadingKey===v.key?.6:1}}>{marketLoadingKey===v.key?"Etsy derin tarama yapılıyor…":"Piyasayı Tara ve Öneri Al"}</button>
               {marketErrorKey===v.key&&marketError&&<div style={{marginBottom:10,padding:10,borderRadius:9,background:"#fef2f2",color:"#991b1b",fontSize:13,lineHeight:1.5}}>{marketError}</div>}
               {marketAnalyses[v.key]&&(()=>{
                 const a=marketAnalyses[v.key];
@@ -540,12 +540,31 @@ export default function ManagerClient({ initialConnected = false }) {
                 const c=a.cost||{};
                 return <div style={{marginBottom:10,padding:12,borderRadius:10,background:"#f8fafc",fontSize:13,lineHeight:1.65}}>
                   <div><strong>Maliyet:</strong> ${Number(c.cost_usd||0).toFixed(2)} <span style={{color:"#6b7280"}}>({c.confidence==="confirmed"?"doğrulandı":"Excel"})</span></div>
-                  <div><strong>Etsy piyasa referansı:</strong> {Number(m.reference_price)>0?<><span>$</span>{Number(m.reference_price).toFixed(2)}</>:"yetersiz veri"} · {m.exact_reference_count||0} tam varyasyon referansı · güven {m.confidence||"LOW"}</div>
-                  <div><strong>Min. kâr tabanı:</strong> ${Number(rec.profit_floor_price||0).toFixed(2)}</div>
+                  <div><strong>Güven skoru:</strong> <span style={{fontWeight:800}}>{Number(m.confidence_score||0)}/100 · {m.confidence||"LOW"}</span></div>
+                  <div><strong>Tarama:</strong> {m.candidate_count||0} aday listing · {m.exact_reference_count||0} tam varyasyon · {m.distinct_shop_count||0} farklı mağaza · kargo kapsaması %{Number(m.shipping_coverage_pct||0).toFixed(0)}</div>
+                  <div><strong>Piyasa bandı:</strong> {Number(m.p25)>0?<><span>$</span>{Number(m.p25).toFixed(2)}</>:"-"} / {Number(m.p50)>0?<><span>$</span>{Number(m.p50).toFixed(2)}</>:"-"} / {Number(m.p75)>0?<><span>$</span>{Number(m.p75).toFixed(2)}</>:"-"} <span style={{color:"#6b7280"}}>(P25 / Medyan / P75)</span></div>
+                  <div><strong>Referans tipi:</strong> {m.reference_mode==="effective_delivered_price"?"Ürün + kargo efektif fiyatı":"Tam varyasyon ürün fiyatı"}</div>
+                  <div><strong>Etsy piyasa referansı:</strong> {Number(m.reference_price)>0?<><span>$</span>{Number(m.reference_price).toFixed(2)}</>:"yetersiz veri"}</div>
+                  <div><strong>Min. kâr tabanı:</strong> <span>$</span>{Number(rec.profit_floor_price||0).toFixed(2)}</div>
                   <div><strong>Öneri kaynağı:</strong> {rec.source==="MARKET"?"ETSY PİYASASI":rec.source==="PROFIT_FLOOR"?"MİNİMUM KÂR TABANI":"PİYASA VERİSİ YETERSİZ — FİYATI KORU"}</div>
-                  <div><strong>Önerilen fiyat:</strong> <span style={{fontSize:16,fontWeight:800,color:"#166534"}}>${Number(rec.next_price||0).toFixed(2)}</span></div>
+                  <div><strong>Önerilen fiyat:</strong> <span style={{fontSize:16,fontWeight:800,color:"#166534"}}><span>$</span>{Number(rec.next_price||0).toFixed(2)}</span></div>
                   <div><strong>Değişim:</strong> {Number(rec.change_pct||0)>=0?"+":""}{Number(rec.change_pct||0).toFixed(2)}% · tahmini kâr marjı %{Number(rec.estimated_margin_pct||0).toFixed(2)}</div>
-                  <div style={{color:"#6b7280"}}>Not: Etsy rakiplerinin gerçek satış fiyatı halka açık değildir; piyasa referansı aktif listing/varyasyon fiyatlarından hesaplanır.</div>
+                  {Array.isArray(m.references)&&m.references.length>0&&<details style={{marginTop:8}}>
+                    <summary style={{cursor:"pointer",fontWeight:700}}>Kullanılan rakip referanslarını göster ({m.references.length})</summary>
+                    <div style={{display:"grid",gap:6,marginTop:8}}>
+                      {m.references.slice(0,20).map((ref,index)=><div key={ref.listing_id||index} style={{padding:"7px 8px",border:"1px solid #e5e7eb",borderRadius:8,background:"#fff"}}>
+                        <div style={{fontWeight:600}}>{String(ref.title||"Rakip listing").slice(0,100)}</div>
+                        <div style={{color:"#6b7280"}}>
+                          Tam varyasyon: <span>$</span>{Number(ref.exact_price||0).toFixed(2)}
+                          {Number.isFinite(Number(ref.shipping_usd))&&<> · Kargo: <span>$</span>{Number(ref.shipping_usd).toFixed(2)}</>}
+                          {Number.isFinite(Number(ref.effective_price))&&<> · Efektif: <span>$</span>{Number(ref.effective_price).toFixed(2)}</>}
+                          {Number(ref.match_quality)>0&&<> · Eşleşme %{Math.round(Number(ref.match_quality)*100)}</>}
+                        </div>
+                        {ref.url&&<a href={ref.url} target="_blank" rel="noreferrer" style={{fontSize:12}}>Etsy listingini aç</a>}
+                      </div>)}
+                    </div>
+                  </details>}
+                  <div style={{color:"#6b7280",marginTop:8}}>Not: Etsy rakiplerinin gerçekleşmiş sipariş fiyatı halka açık değildir. Analiz aktif listinglerin tam varyasyon fiyatlarını, mümkün olduğunda kargoyu ve farklı mağaza dağılımını kullanır.</div>
                 </div>;
               })()}
               <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:8}}><input type="number" min="0.01" step="0.01" placeholder="Yeni fiyat" value={globalPrices[v.key]||""} onChange={e=>setGlobalPrices(x=>({...x,[v.key]:e.target.value}))} style={styles.input}/><button type="button" onClick={()=>applyGlobalPrice(v)} disabled={globalLoading} style={{...styles.button,width:"auto",background:"#8a6b20"}}>Önizle + Tümüne Uygula</button></div>
