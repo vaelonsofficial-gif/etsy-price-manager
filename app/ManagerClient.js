@@ -216,7 +216,11 @@ export default function ManagerClient({ initialConnected = false }) {
       }));
 
       const recommended = Number(data?.recommendation?.next_price);
-      if (recommended > 0) {
+      const source = String(data?.recommendation?.source || "");
+      if (
+        recommended > 0 &&
+        (source === "MARKET" || source === "PROFIT_FLOOR")
+      ) {
         setGlobalPrices((current) => ({
           ...current,
           [v.key]: recommended.toFixed(2)
@@ -538,6 +542,7 @@ export default function ManagerClient({ initialConnected = false }) {
                   <div><strong>Maliyet:</strong> ${Number(c.cost_usd||0).toFixed(2)} <span style={{color:"#6b7280"}}>({c.confidence==="confirmed"?"doğrulandı":"Excel"})</span></div>
                   <div><strong>Etsy piyasa referansı:</strong> {Number(m.reference_price)>0?<><span>$</span>{Number(m.reference_price).toFixed(2)}</>:"yetersiz veri"} · {m.exact_reference_count||0} tam varyasyon referansı · güven {m.confidence||"LOW"}</div>
                   <div><strong>Min. kâr tabanı:</strong> ${Number(rec.profit_floor_price||0).toFixed(2)}</div>
+                  <div><strong>Öneri kaynağı:</strong> {rec.source==="MARKET"?"ETSY PİYASASI":rec.source==="PROFIT_FLOOR"?"MİNİMUM KÂR TABANI":"PİYASA VERİSİ YETERSİZ — FİYATI KORU"}</div>
                   <div><strong>Önerilen fiyat:</strong> <span style={{fontSize:16,fontWeight:800,color:"#166534"}}>${Number(rec.next_price||0).toFixed(2)}</span></div>
                   <div><strong>Değişim:</strong> {Number(rec.change_pct||0)>=0?"+":""}{Number(rec.change_pct||0).toFixed(2)}% · tahmini kâr marjı %{Number(rec.estimated_margin_pct||0).toFixed(2)}</div>
                   <div style={{color:"#6b7280"}}>Not: Etsy rakiplerinin gerçek satış fiyatı halka açık değildir; piyasa referansı aktif listing/varyasyon fiyatlarından hesaplanır.</div>
