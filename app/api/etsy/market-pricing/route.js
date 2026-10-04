@@ -119,11 +119,11 @@ export async function POST(request) {
           minReferences:
             Number.isFinite(Number(body?.minReferences))
               ? Number(body.minReferences)
-              : 4,
+              : 10,
           searchLimit:
             Number.isFinite(Number(body?.searchLimit))
               ? Number(body.searchLimit)
-              : 20
+              : 300
         })
       }
     );
