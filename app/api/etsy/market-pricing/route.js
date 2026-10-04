@@ -123,7 +123,7 @@ export async function POST(request) {
           searchLimit:
             Number.isFinite(Number(body?.searchLimit))
               ? Number(body.searchLimit)
-              : 180
+              : 300
         })
       }
     );
