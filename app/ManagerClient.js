@@ -37,6 +37,16 @@ export default function ManagerClient({ initialConnected = false }) {
   const [globalError, setGlobalError] = useState("");
   const [apiKeyConfigured, setApiKeyConfigured] = useState(null);
   const [bridgeConfigured, setBridgeConfigured] = useState(false);
+  const [marketSettings, setMarketSettings] = useState({
+    minMarginPct: 20,
+    marketAdjustmentPct: 0,
+    maxStepPct: 5,
+    etsyNetRatioPct: 80.32,
+    buyerCountry: "US"
+  });
+  const [marketAnalyses, setMarketAnalyses] = useState({});
+  const [marketLoadingKey, setMarketLoadingKey] = useState("");
+  const [marketError, setMarketError] = useState("");
 
   const timezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Yerel saat",
@@ -167,6 +177,56 @@ export default function ManagerClient({ initialConnected = false }) {
     try { const response=await fetch("/api/etsy/global-prices",{cache:"no-store"}); const data=await response.json(); if(!response.ok) throw new Error(data.error||"Varyasyonlar taranamadı."); setGlobalVariations(data.variations||[]); setReferenceListing(data.reference_listing||null); setGlobalListingCount(Number(data.active_listing_count||0)); setGlobalMessage(`${Number(data.active_listing_count||0)} aktif listing hedefe alındı. Mevcut fiyatlar eşleştirmede dikkate alınmayacak.`); }
     catch(err){setGlobalError(err.message||"Varyasyonlar taranamadı.");} finally{setGlobalLoading(false);}
   }
+  async function analyzeMarketPrice(v) {
+    const currentPrice = Number(v.current_price);
+    if (!(currentPrice > 0)) {
+      setMarketError("Bu varyasyonun mevcut fiyatı okunamadı.");
+      return;
+    }
+
+    setMarketLoadingKey(v.key);
+    setMarketError("");
+
+    try {
+      const response = await fetch("/api/etsy/market-pricing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          variationKey: v.key,
+          label: v.label,
+          currentPrice,
+          minMarginPct: Number(marketSettings.minMarginPct),
+          marketAdjustmentPct: Number(marketSettings.marketAdjustmentPct),
+          maxStepPct: Number(marketSettings.maxStepPct),
+          etsyNetRatio: Number(marketSettings.etsyNetRatioPct) / 100,
+          buyerCountry: marketSettings.buyerCountry
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Piyasa fiyat analizi başarısız.");
+      }
+
+      setMarketAnalyses((current) => ({
+        ...current,
+        [v.key]: data
+      }));
+
+      const recommended = Number(data?.recommendation?.next_price);
+      if (recommended > 0) {
+        setGlobalPrices((current) => ({
+          ...current,
+          [v.key]: recommended.toFixed(2)
+        }));
+      }
+    } catch (error) {
+      setMarketError(error.message || "Piyasa fiyat analizi başarısız.");
+    } finally {
+      setMarketLoadingKey("");
+    }
+  }
+
   async function applyGlobalPrice(v) {
     const value=Number(globalPrices[v.key]); if(!Number.isFinite(value)||value<=0) return setGlobalError("Geçerli bir yeni fiyat gir.");
     setGlobalLoading(true); setGlobalError(""); setGlobalMessage("Tüm aktif listingler taranıyor; mevcut fiyatlar dikkate alınmıyor…");
@@ -192,7 +252,7 @@ export default function ManagerClient({ initialConnected = false }) {
         let data=null;
         for(let attempt=0;attempt<3;attempt++){
           try{
-            const response=await fetch("/api/etsy/global-prices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({variationKey:v.key,price:value,confirm:true,listingIds:batches[index]})});
+            const response=await fetch("/api/etsy/global-prices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({variationKey:v.key,price:value,confirm:true,listingIds:batches[index],pricingSafety:{label:v.label,currentPrice:Number(v.current_price),minMarginPct:Number(marketSettings.minMarginPct),etsyNetRatio:Number(marketSettings.etsyNetRatioPct)/100,maxStepPct:Number(marketSettings.maxStepPct)}})});
             data=await response.json();
             if(!response.ok) throw new Error(data.error||"Toplu güncelleme başarısız.");
             lastError=null;
@@ -442,18 +502,49 @@ export default function ManagerClient({ initialConnected = false }) {
         <section style={{ ...styles.card, marginTop: 18 }}>
           <h2 style={{marginTop:0,marginBottom:8,fontSize:22}}>Global Varyasyon Fiyatları</h2>
           {bridgeConfigured && <div style={{marginBottom:12,padding:10,borderRadius:9,background:"#ecfdf5",color:"#166534",fontSize:13}}>● VAELONS Seller Bridge bağlı · keystring girişi gerekmez</div>}
-          <p style={{color:"#6b7280",lineHeight:1.6,marginTop:0}}>Bir referans listingden varyasyonu seç. Mevcut fiyat ne olursa olsun aynı varyasyon tüm aktif listinglerde bulunur ve girdiğin yeni fiyat uygulanır.</p>
+          <p style={{color:"#6b7280",lineHeight:1.6,marginTop:0}}>Önce piyasayı tara ve önerilen fiyatı gör. Fiyat ancak sen onaylarsan mevcut güvenli toplu güncelleme sistemiyle uygulanır.</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(135px,1fr))",gap:8,marginBottom:12}}>
+            <label style={{fontSize:12,fontWeight:700}}>Min. kâr %
+              <input type="number" min="0" max="70" step="1" value={marketSettings.minMarginPct} onChange={e=>setMarketSettings(x=>({...x,minMarginPct:e.target.value}))} style={{...styles.input,marginTop:5}}/>
+            </label>
+            <label style={{fontSize:12,fontWeight:700}}>Piyasa konumu %
+              <input type="number" min="-30" max="50" step="1" value={marketSettings.marketAdjustmentPct} onChange={e=>setMarketSettings(x=>({...x,marketAdjustmentPct:e.target.value}))} style={{...styles.input,marginTop:5}}/>
+            </label>
+            <label style={{fontSize:12,fontWeight:700}}>Maks. adım %
+              <input type="number" min="1" max="30" step="1" value={marketSettings.maxStepPct} onChange={e=>setMarketSettings(x=>({...x,maxStepPct:e.target.value}))} style={{...styles.input,marginTop:5}}/>
+            </label>
+            <label style={{fontSize:12,fontWeight:700}}>Etsy sonrası kalan %
+              <input type="number" min="1" max="100" step="0.01" value={marketSettings.etsyNetRatioPct} onChange={e=>setMarketSettings(x=>({...x,etsyNetRatioPct:e.target.value}))} style={{...styles.input,marginTop:5}}/>
+            </label>
+          </div>
+          <div style={{fontSize:12,color:"#6b7280",marginBottom:12}}>Varsayılan: minimum %20 gerçek kâr · piyasa konumu %0 · tek seferde en fazla %5 fiyat adımı · Etsy net oranı gerçek $249 → $200 siparişinden %80,32.</div>
           <button type="button" onClick={scanGlobalPrices} disabled={globalLoading} style={{...styles.button,opacity:globalLoading?.6:1}}>{globalLoading?"VAELONS taranıyor…":"Varyasyonları Getir"}</button>
           {globalVariations.length>0&&<div style={{marginTop:16}}>
             <div style={{fontSize:13,color:"#6b7280",marginBottom:12}}>Referans: <strong>{referenceListing?.title || "VAELONS listing"}</strong> · <strong>{globalVariations.length}</strong> varyasyon · <strong>{globalListingCount}</strong> aktif listing</div><input type="search" placeholder="Varyasyon ara: rolled, canvas, 13×18..." value={variationSearch} onChange={e=>setVariationSearch(e.target.value)} style={{...styles.input,marginBottom:12}} />
             <div style={{display:"grid",gap:10}}>{globalVariations.filter(v => `${v.label} ${v.key}`.toLocaleLowerCase("tr-TR").includes(variationSearch.trim().toLocaleLowerCase("tr-TR"))).map(v=><div key={v.key} style={{border:"1px solid #e5e7eb",borderRadius:12,padding:14}}>
               <div style={{fontWeight:700,lineHeight:1.5}}>{v.label}</div>
-              <div style={{fontSize:13,color:"#6b7280",margin:"5px 0 10px"}}>Mevcut fiyat dikkate alınmaz · hedef: tüm aktif listinglerde bu varyasyon</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:8}}><input type="number" min="0.01" step="0.01" placeholder="Yeni fiyat" value={globalPrices[v.key]||""} onChange={e=>setGlobalPrices(x=>({...x,[v.key]:e.target.value}))} style={styles.input}/><button type="button" onClick={()=>applyGlobalPrice(v)} disabled={globalLoading} style={{...styles.button,width:"auto",background:"#8a6b20"}}>Tümüne Uygula</button></div>
+              <div style={{fontSize:13,color:"#6b7280",margin:"5px 0 10px"}}>Mevcut referans fiyat: <strong>{Number(v.current_price)>0?`${Number(v.current_price).toFixed(2)}`:"okunamadı"}</strong></div>
+              <button type="button" onClick={()=>analyzeMarketPrice(v)} disabled={marketLoadingKey===v.key||globalLoading} style={{...styles.button,marginBottom:10,background:"#1f4e78",opacity:marketLoadingKey===v.key?.6:1}}>{marketLoadingKey===v.key?"Etsy piyasası taranıyor…":"Piyasayı Tara ve Öneri Al"}</button>
+              {marketAnalyses[v.key]&&(()=>{
+                const a=marketAnalyses[v.key];
+                const m=a.market||{};
+                const rec=a.recommendation||{};
+                const c=a.cost||{};
+                return <div style={{marginBottom:10,padding:12,borderRadius:10,background:"#f8fafc",fontSize:13,lineHeight:1.65}}>
+                  <div><strong>Maliyet:</strong> ${Number(c.cost_usd||0).toFixed(2)} <span style={{color:"#6b7280"}}>({c.confidence==="confirmed"?"doğrulandı":"Excel"})</span></div>
+                  <div><strong>Etsy piyasa referansı:</strong> {Number(m.reference_price)>0?`${Number(m.reference_price).toFixed(2)}`:"yetersiz veri"} · {m.exact_reference_count||0} tam varyasyon referansı · güven {m.confidence||"LOW"}</div>
+                  <div><strong>Min. kâr tabanı:</strong> ${Number(rec.profit_floor_price||0).toFixed(2)}</div>
+                  <div><strong>Önerilen fiyat:</strong> <span style={{fontSize:16,fontWeight:800,color:"#166534"}}>${Number(rec.next_price||0).toFixed(2)}</span></div>
+                  <div><strong>Değişim:</strong> {Number(rec.change_pct||0)>=0?"+":""}{Number(rec.change_pct||0).toFixed(2)}% · tahmini kâr marjı %{Number(rec.estimated_margin_pct||0).toFixed(2)}</div>
+                  <div style={{color:"#6b7280"}}>Not: Etsy rakiplerinin gerçek satış fiyatı halka açık değildir; piyasa referansı aktif listing/varyasyon fiyatlarından hesaplanır.</div>
+                </div>;
+              })()}
+              <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:8}}><input type="number" min="0.01" step="0.01" placeholder="Yeni fiyat" value={globalPrices[v.key]||""} onChange={e=>setGlobalPrices(x=>({...x,[v.key]:e.target.value}))} style={styles.input}/><button type="button" onClick={()=>applyGlobalPrice(v)} disabled={globalLoading} style={{...styles.button,width:"auto",background:"#8a6b20"}}>Önizle + Tümüne Uygula</button></div>
             </div>)}</div>
           </div>}
           {globalMessage&&<div style={{marginTop:14,padding:12,borderRadius:10,background:"#ecfdf5",color:"#166534"}}>{globalMessage}</div>}
           {globalError&&<div style={{marginTop:14,padding:12,borderRadius:10,background:"#fef2f2",color:"#991b1b"}}>{globalError}</div>}
+          {marketError&&<div style={{marginTop:14,padding:12,borderRadius:10,background:"#fff7ed",color:"#9a3412"}}>{marketError}</div>}
         </section>
       )}
 

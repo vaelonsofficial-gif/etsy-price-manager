@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { getVaelonsCost } from "../../../../lib/vaelons-cost-catalog";
 import {
   scanGlobalVariations,
   previewGlobalVariationPrice,
@@ -78,7 +79,11 @@ export async function GET() {
         variations: (data?.variations || []).map((item) => ({
           key: item.key,
           label: item.label,
-          reference_product_id: item.referenceProductId
+          reference_product_id: item.referenceProductId,
+          current_price:
+            Number.isFinite(Number(item.currentPrice))
+              ? Number(item.currentPrice)
+              : null
         })),
         connection_mode: "seller-bridge"
       });
@@ -133,6 +138,61 @@ export async function POST(request) {
           { error: "Önizleme veya confirm=true gerekli." },
           { status: 400 }
         );
+      }
+
+      if (body?.pricingSafety) {
+        const safety = body.pricingSafety || {};
+        const cost = getVaelonsCost({
+          variationKey: body.variationKey,
+          label: safety.label
+        });
+        const nextPrice = Number(body.price);
+        const currentPrice = Number(safety.currentPrice);
+        const minMargin = Number(safety.minMarginPct) / 100;
+        const netRatio = Number(safety.etsyNetRatio);
+        const maxStep = Math.abs(Number(safety.maxStepPct)) / 100;
+
+        if (!cost.found || !(cost.cost_usd > 0)) {
+          return NextResponse.json(
+            { error: "Maliyet güvenlik kuralı bulunamadı." },
+            { status: 400 }
+          );
+        }
+
+        if (!(netRatio > minMargin && minMargin >= 0)) {
+          return NextResponse.json(
+            { error: "Kâr marjı / Etsy net oranı ayarı geçersiz." },
+            { status: 400 }
+          );
+        }
+
+        const minimumProfitFloor = cost.cost_usd / (netRatio - minMargin);
+
+        if (!(nextPrice >= minimumProfitFloor - 0.01)) {
+          return NextResponse.json(
+            {
+              error: `Bu fiyat minimum kâr sınırının altında. Alt sınır: ${minimumProfitFloor.toFixed(2)}`,
+              minimum_profit_floor: minimumProfitFloor
+            },
+            { status: 400 }
+          );
+        }
+
+        if (
+          currentPrice > 0 &&
+          maxStep > 0 &&
+          currentPrice >= minimumProfitFloor
+        ) {
+          const changePct = Math.abs(nextPrice - currentPrice) / currentPrice;
+          if (changePct > maxStep + 0.0001) {
+            return NextResponse.json(
+              {
+                error: `Tek seferlik değişim %${(changePct * 100).toFixed(2)}. İzin verilen maksimum adım %${(maxStep * 100).toFixed(2)}.`
+              },
+              { status: 400 }
+            );
+          }
+        }
       }
 
       const data = await bridgeFetch(
