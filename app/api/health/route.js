@@ -11,6 +11,7 @@ export async function GET() {
     write_verification: true,
   canonical_host: "etsy-price-manager.vercel.app",
     etsy_env_configured: Boolean(process.env.ETSY_API_KEY),
+    bridge_env_configured: Boolean(process.env.ETSY_BRIDGE_URL && process.env.VAELONS_BRIDGE_TOKEN),
     credential_mode: "server-only",
     user_key_input_required: false,
     etsy_session_fallback_supported: false,
