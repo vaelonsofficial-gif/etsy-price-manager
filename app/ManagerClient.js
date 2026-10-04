@@ -47,6 +47,7 @@ export default function ManagerClient({ initialConnected = false }) {
   const [marketAnalyses, setMarketAnalyses] = useState({});
   const [marketLoadingKey, setMarketLoadingKey] = useState("");
   const [marketError, setMarketError] = useState("");
+  const [marketErrorKey, setMarketErrorKey] = useState("");
 
   const timezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Yerel saat",
@@ -186,6 +187,7 @@ export default function ManagerClient({ initialConnected = false }) {
 
     setMarketLoadingKey(v.key);
     setMarketError("");
+    setMarketErrorKey("");
 
     try {
       const response = await fetch("/api/etsy/market-pricing", {
@@ -222,6 +224,7 @@ export default function ManagerClient({ initialConnected = false }) {
       }
     } catch (error) {
       setMarketError(error.message || "Piyasa fiyat analizi başarısız.");
+      setMarketErrorKey(v.key);
     } finally {
       setMarketLoadingKey("");
     }
@@ -525,6 +528,7 @@ export default function ManagerClient({ initialConnected = false }) {
               <div style={{fontWeight:700,lineHeight:1.5}}>{v.label}</div>
               <div style={{fontSize:13,color:"#6b7280",margin:"5px 0 10px"}}>Mevcut referans fiyat: <strong>{Number(v.current_price)>0?`${Number(v.current_price).toFixed(2)}`:"okunamadı"}</strong></div>
               <button type="button" onClick={()=>analyzeMarketPrice(v)} disabled={marketLoadingKey===v.key||globalLoading} style={{...styles.button,marginBottom:10,background:"#1f4e78",opacity:marketLoadingKey===v.key?.6:1}}>{marketLoadingKey===v.key?"Etsy piyasası taranıyor…":"Piyasayı Tara ve Öneri Al"}</button>
+              {marketErrorKey===v.key&&marketError&&<div style={{marginBottom:10,padding:10,borderRadius:9,background:"#fef2f2",color:"#991b1b",fontSize:13,lineHeight:1.5}}>{marketError}</div>}
               {marketAnalyses[v.key]&&(()=>{
                 const a=marketAnalyses[v.key];
                 const m=a.market||{};
