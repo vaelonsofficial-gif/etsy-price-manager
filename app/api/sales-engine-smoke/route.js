@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
+// canonical-preview-trigger
 
 export async function GET() {
   const baseUrl = "https://vaelons-etsy-seller-bridge-3dql-qn8qjy3vp.vercel.app";
