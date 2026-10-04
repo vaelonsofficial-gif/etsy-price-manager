@@ -252,7 +252,7 @@ export default function ManagerClient({ initialConnected = false }) {
         let data=null;
         for(let attempt=0;attempt<3;attempt++){
           try{
-            const response=await fetch("/api/etsy/global-prices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({variationKey:v.key,price:value,confirm:true,listingIds:batches[index]})});
+            const response=await fetch("/api/etsy/global-prices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({variationKey:v.key,price:value,confirm:true,listingIds:batches[index],pricingSafety:{label:v.label,currentPrice:Number(v.current_price),minMarginPct:Number(marketSettings.minMarginPct),etsyNetRatio:Number(marketSettings.etsyNetRatioPct)/100,maxStepPct:Number(marketSettings.maxStepPct)}})});
             data=await response.json();
             if(!response.ok) throw new Error(data.error||"Toplu güncelleme başarısız.");
             lastError=null;
