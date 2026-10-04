@@ -37,6 +37,16 @@ export default function ManagerClient({ initialConnected = false }) {
   const [globalError, setGlobalError] = useState("");
   const [apiKeyConfigured, setApiKeyConfigured] = useState(null);
   const [bridgeConfigured, setBridgeConfigured] = useState(false);
+  const [marketSettings, setMarketSettings] = useState({
+    minMarginPct: 20,
+    marketAdjustmentPct: 0,
+    maxStepPct: 5,
+    etsyNetRatioPct: 80.32,
+    buyerCountry: "US"
+  });
+  const [marketAnalyses, setMarketAnalyses] = useState({});
+  const [marketLoadingKey, setMarketLoadingKey] = useState("");
+  const [marketError, setMarketError] = useState("");
 
   const timezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Yerel saat",
@@ -167,6 +177,56 @@ export default function ManagerClient({ initialConnected = false }) {
     try { const response=await fetch("/api/etsy/global-prices",{cache:"no-store"}); const data=await response.json(); if(!response.ok) throw new Error(data.error||"Varyasyonlar taranamadı."); setGlobalVariations(data.variations||[]); setReferenceListing(data.reference_listing||null); setGlobalListingCount(Number(data.active_listing_count||0)); setGlobalMessage(`${Number(data.active_listing_count||0)} aktif listing hedefe alındı. Mevcut fiyatlar eşleştirmede dikkate alınmayacak.`); }
     catch(err){setGlobalError(err.message||"Varyasyonlar taranamadı.");} finally{setGlobalLoading(false);}
   }
+  async function analyzeMarketPrice(v) {
+    const currentPrice = Number(v.current_price);
+    if (!(currentPrice > 0)) {
+      setMarketError("Bu varyasyonun mevcut fiyatı okunamadı.");
+      return;
+    }
+
+    setMarketLoadingKey(v.key);
+    setMarketError("");
+
+    try {
+      const response = await fetch("/api/etsy/market-pricing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          variationKey: v.key,
+          label: v.label,
+          currentPrice,
+          minMarginPct: Number(marketSettings.minMarginPct),
+          marketAdjustmentPct: Number(marketSettings.marketAdjustmentPct),
+          maxStepPct: Number(marketSettings.maxStepPct),
+          etsyNetRatio: Number(marketSettings.etsyNetRatioPct) / 100,
+          buyerCountry: marketSettings.buyerCountry
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Piyasa fiyat analizi başarısız.");
+      }
+
+      setMarketAnalyses((current) => ({
+        ...current,
+        [v.key]: data
+      }));
+
+      const recommended = Number(data?.recommendation?.next_price);
+      if (recommended > 0) {
+        setGlobalPrices((current) => ({
+          ...current,
+          [v.key]: recommended.toFixed(2)
+        }));
+      }
+    } catch (error) {
+      setMarketError(error.message || "Piyasa fiyat analizi başarısız.");
+    } finally {
+      setMarketLoadingKey("");
+    }
+  }
+
   async function applyGlobalPrice(v) {
     const value=Number(globalPrices[v.key]); if(!Number.isFinite(value)||value<=0) return setGlobalError("Geçerli bir yeni fiyat gir.");
     setGlobalLoading(true); setGlobalError(""); setGlobalMessage("Tüm aktif listingler taranıyor; mevcut fiyatlar dikkate alınmıyor…");
