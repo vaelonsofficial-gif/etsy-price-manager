@@ -1,0 +1,1 @@
+import ThumbnailEnginePanel from "../ThumbnailEnginePanel"; export default function Page(){return <ThumbnailEnginePanel/>}
