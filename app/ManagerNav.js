@@ -1,4 +1,4 @@
 export default function ManagerNav(){return <nav style={{display:"flex",gap:10,flexWrap:"wrap",maxWidth:1100,margin:"18px auto 0",padding:"0 20px",fontFamily:"Arial,sans-serif"}}>
-<a href="/" style={link}>Price Manager</a><a href="/sales-engine" style={link}>Sales Engine</a><a href="/seo-manager" style={link}>SEO Manager</a>
+<a href="/" style={link}>Price Manager</a><a href="/sales-engine" style={link}>Sales Engine</a><a href="/seo-manager" style={link}>SEO Manager</a><a href="/thumbnail-engine" style={link}>Thumbnail Engine</a>
 <span style={{marginLeft:"auto",fontSize:12,color:"#6b7280",alignSelf:"center"}}>VAELONS Manager · tek sistem</span></nav>}
 const link={padding:"9px 12px",border:"1px solid #d1d5db",borderRadius:9,textDecoration:"none",color:"#111827",background:"#fff",fontWeight:700,fontSize:13};
