@@ -38,8 +38,23 @@ export async function GET(request) {
 
 export async function POST(request) {
   const body = await request.json().catch(() => ({}));
+  if (body.action === "prepare") {
+    const listingId = String(body.listing_id || "").trim();
+    if (!/^\\d+$/.test(listingId)) return NextResponse.json({ error: "Geçersiz listing ID.", etsy_modified: false }, { status: 400 });
+    const { response, data } = await bridge(`/listings/${listingId}/prepare`, {
+      method: "POST",
+      body: JSON.stringify({
+        proposed_title: body.proposed_title,
+        proposed_tags: body.proposed_tags,
+        proposed_description: body.proposed_description,
+        reason: body.reason || "etsy_market_research_listing_specific"
+      })
+    });
+    if (!response) return NextResponse.json(data, { status: 503 });
+    return NextResponse.json({ ...data, publish_enabled: false, etsy_modified: false }, { status: response.status });
+  }
   if (body.action !== "scan") {
-    return NextResponse.json({ error: "Bu sürüm yalnız güvenli SEO taramasını destekler.", etsy_modified: false }, { status: 400 });
+    return NextResponse.json({ error: "Desteklenmeyen SEO işlemi.", etsy_modified: false }, { status: 400 });
   }
   const { response, data } = await bridge("/scan", {
     method: "POST",
