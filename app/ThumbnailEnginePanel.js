@@ -1,24 +1,6 @@
-"use client";
-import {useState} from "react";
-const presets=[
-["floor_large","Yerde Büyük","Büyük canvas zeminde duvara yaslı; artwork tam görünür, gerçekçi perspektif ve ölçek."],
-["wall_large","Duvarda Büyük","Büyük statement canvas ana duvarda; artwork tam görünür, oda sade ve premium."],
-["living_room","Salon Lifestyle","Modern premium salonda büyük canvas; ürün odak noktası."],
-["bedroom","Yatak Odası","Sakin premium yatak odasında büyük canvas; ölçek net."],
-["detail","Detay","Canvas yüzeyi/kenarı ve baskı detayını yakın planda göster."],
-["scale","Ölçek","Mobilya referansıyla ürünün büyük ölçüsünü anlaşılır göster."]
-];
-export default function ThumbnailEnginePanel(){
- const [artwork,setArtwork]=useState(""),[preset,setPreset]=useState("floor_large"),[count,setCount]=useState(10);
- return <main style={{maxWidth:1050,margin:"32px auto",padding:"0 20px",fontFamily:"Arial,sans-serif"}}>
- <h1>VAELONS Thumbnail Engine</h1>
- <p style={{color:"#6b7280",lineHeight:1.6}}>Artwork'u bozmadan satış odaklı Etsy görsel seti planlar. Canlı Etsy'ye otomatik yükleme kapalıdır; önce üretim ve önizleme gerekir.</p>
- <section style={box}><b>Artwork kaynağı</b><input value={artwork} onChange={e=>setArtwork(e.target.value)} placeholder="Listing ID / artwork asset ID" style={input}/><small>Kaynak artwork değiştirilemez: crop, yeniden çizim, renk değiştirme ve beyaz kenar ekleme yasak.</small></section>
- <section style={box}><b>Mockup preset</b><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10,marginTop:12}}>{presets.map(([id,n,d])=><button key={id} onClick={()=>setPreset(id)} style={{...card,border:preset===id?"2px solid #111827":"1px solid #e5e7eb"}}><strong>{n}</strong><span style={{fontSize:12,color:"#6b7280"}}>{d}</span></button>)}</div></section>
- <section style={box}><b>Set boyutu</b><select value={count} onChange={e=>setCount(Number(e.target.value))} style={input}><option>1</option><option>5</option><option>10</option></select><div style={{marginTop:10,fontSize:13}}>Seçili: <b>{presets.find(x=>x[0]===preset)?.[1]}</b> · {count} çıktı · hedef kısa kenar ≥2000px.</div></section>
- <div style={{padding:14,borderRadius:12,background:"#fffbeb",color:"#92400e",fontSize:13,lineHeight:1.5}}>Güvenlik: Bu panel üretim sözleşmesini hazırlar. Görsel üretim sağlayıcısı bağlanmadan sahte çıktı üretmez; Etsy yükleme/yayınlama ayrıca önizleme ve onay kapısından geçer.</div>
- </main>
-}
-const box={background:"#fff",border:"1px solid #e5e7eb",borderRadius:14,padding:16,margin:"14px 0",display:"grid",gap:8};
-const input={padding:11,border:"1px solid #d1d5db",borderRadius:9};
-const card={padding:14,borderRadius:12,background:"#fff",textAlign:"left",display:"grid",gap:6,cursor:"pointer"};
+"use client";import{useState}from"react";
+const P=[["floor_large","Yerde Büyük"],["wall_large","Duvarda Büyük"],["living_room","Salon"],["bedroom","Yatak Odası"],["detail","Detay"],["scale","Ölçek"]];
+export default function ThumbnailEnginePanel(){const[id,setId]=useState(""),[preset,setPreset]=useState("floor_large"),[source,setSource]=useState(null),[err,setErr]=useState(""),[busy,setBusy]=useState(false);
+async function lock(){setBusy(true);setErr("");setSource(null);try{const r=await fetch("/api/etsy/thumbnail-engine",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"source",listingId:id})});const j=await r.json();if(!r.ok)throw new Error(j.error||"Artwork alınamadı");setSource(j);}catch(e){setErr(e.message)}finally{setBusy(false)}}
+return <main style={{maxWidth:1050,margin:"32px auto",padding:"0 20px",fontFamily:"Arial"}}><h1>VAELONS Thumbnail Engine</h1><p>Listingdeki <b>1. görsel</b> değişmez kaynak artwork'tür. Kaynak doğrulanmadan üretim başlamaz.</p><div style={box}><input value={id} onChange={e=>setId(e.target.value)} placeholder="Etsy Listing ID" style={input}/><button onClick={lock} disabled={busy} style={btn}>{busy?"Artwork okunuyor…":"1. Artwork'ü Getir ve Kilitle"}</button></div>{err&&<div style={error}>{err}</div>}{source&&<div style={box}><b>Kaynak kilitlendi · Rank 1</b><div>{source.title}</div><img src={source.source_artwork.url} alt="Listing source artwork" style={{maxWidth:"100%",maxHeight:420,objectFit:"contain",background:"#eee",borderRadius:10}}/><small>Image ID: {source.source_artwork.listing_image_id}. Bu artwork dışında thumbnail üretilemez.</small></div>}<div style={box}><b>Mockup tipi</b><div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{P.map(x=><button key={x[0]} onClick={()=>setPreset(x[0])} style={{...btn,background:preset===x[0]?"#111827":"#fff",color:preset===x[0]?"#fff":"#111"}}>{x[1]}</button>)}</div><p style={{fontSize:13,color:"#6b7280"}}>Üretim sağlayıcısı bağlanana kadar Etsy'ye görsel yazılmaz. Artwork değiştirme/crop/recolor/stretch yasaktır.</p></div></main>}
+const box={background:"#fff",border:"1px solid #ddd",borderRadius:14,padding:16,margin:"14px 0",display:"grid",gap:10};const input={padding:12,border:"1px solid #ccc",borderRadius:9};const btn={padding:"11px 14px",border:"1px solid #ccc",borderRadius:9,fontWeight:700,cursor:"pointer"};const error={padding:12,background:"#fef2f2",color:"#991b1b",borderRadius:10};
