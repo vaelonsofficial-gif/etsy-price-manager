@@ -2,7 +2,9 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { openPaperNexaSecret, keystring } from "../../../../lib/papernexa";
 
-const CANONICAL_ORIGIN = "https://etsy-price-manager.vercel.app";\nconst PAPER_NEXA_REDIRECT_URI =\n  "https://papernexa-studio.bekirebru07.chatgpt.site/api/etsy?step=callback";
+const CANONICAL_ORIGIN = "https://etsy-price-manager.vercel.app";
+const PAPER_NEXA_REDIRECT_URI =
+  "https://papernexa-studio.bekirebru07.chatgpt.site/api/etsy?step=callback";
 
 export async function GET(request) {
   try {
