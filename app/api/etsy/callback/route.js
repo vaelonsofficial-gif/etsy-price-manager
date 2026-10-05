@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { openPaperNexaSecret, sealPaperNexaSecret } from "../../../../lib/papernexa";
+import { openPaperNexaSecret, sealPaperNexaSecret } from "../../../../lib/papernexa";\n\nconst PAPER_NEXA_REDIRECT_URI =\n  "https://papernexa-studio.bekirebru07.chatgpt.site/api/etsy?step=callback";
 
 function normalizeShopPayload(payload) {
   if (payload?.shop_id) return payload;
@@ -71,7 +71,7 @@ export async function GET(request) {
       return NextResponse.json({ error: "Etsy sunucu bağlantısı henüz yapılandırılmadı." }, { status: 500 });
     }
 
-    const redirectUri = `${canonicalOrigin}/api/etsy/callback`;
+    const redirectUri =\n      profile === "papernexa"\n        ? PAPER_NEXA_REDIRECT_URI\n        : `${canonicalOrigin}/api/etsy/callback`;
     const tokenResponse = await fetch("https://api.etsy.com/v3/public/oauth/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
