@@ -40,25 +40,35 @@ export async function GET(request) {
 function words(v){return String(v||"").toLowerCase().replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(x=>x.length>2)}
 function uniq(a){return [...new Set(a)]}
 function proposalFromEvidence(title,tags,description,evidence){
-  const stop=new Set(["with","and","the","for","from","this","that","print","poster","digital","download","wall","perfect","beautiful","wonderful","gift","gifts"]);
-  const own=uniq([...words(title),...(tags||[]).flatMap(words)]).filter(w=>!stop.has(w));
+  const rawParts=String(title||"").split(/[·|,]/).map(x=>x.trim()).filter(Boolean);
+  const generic=new Set(["art","canvas","wall","decor","home decor","canvas wall art","canvas art","wall art","office","gift","gifts"]);
+  const seen=new Set(), identity=[];
+  for(const part of rawParts){
+    const k=part.toLowerCase();
+    if(generic.has(k)||seen.has(k))continue;
+    seen.add(k); identity.push(part);
+  }
+  const stop=new Set(["with","and","the","for","from","this","that","print","poster","digital","download","wall","perfect","beautiful","wonderful","gift","gifts","canvas","art","decor"]);
+  const own=uniq([...(tags||[]).flatMap(words),...words(title)]).filter(w=>!stop.has(w));
   const freq={};
   for(const t of evidence){for(const w of words(t).filter(w=>!stop.has(w)))freq[w]=(freq[w]||0)+1}
-  const allowed=w=>own.includes(w)||["canvas","art","decor","home","luxury","vintage","floral","abstract","painting","modern","boho","minimalist","framed","unframed","landscape","portrait"].includes(w);
-  const terms=Object.entries(freq).filter(([w])=>allowed(w)).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
-  const item=own.includes("canvas")?"Canvas Wall Art":own.includes("painting")?"Canvas Painting":"Canvas Wall Art";
-  const descriptors=uniq([...terms,...own]).filter(w=>!["canvas","wall","art","decor","home","room","gift"].includes(w)).slice(0,6);
-  const titleWords=uniq([...descriptors,item]).join(" ").split(/\s+/).filter(Boolean);
-  let proposed_title=titleWords.slice(0,15).join(" ").replace(/\b\w/g,m=>m.toUpperCase()).slice(0,140).trim();
-  if(!/canvas/i.test(proposed_title)) proposed_title=(proposed_title+" Canvas Wall Art").slice(0,140);
-  const candidates=uniq([item.toLowerCase(),...descriptors.map(w=>w+" canvas"),...terms,...(tags||[])]).map(x=>x.trim()).filter(x=>x.length>=3&&x.length<=20);
+  const ranked=Object.entries(freq).filter(([w])=>own.includes(w)).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+  const identityText=identity.slice(0,4).join(" ").replace(/\s+/g," ").trim();
+  const identityWords=words(identityText);
+  const extras=ranked.filter(w=>!identityWords.includes(w)).slice(0,3);
+  let subject=identityText || own.slice(0,4).join(" ");
+  subject=subject.replace(/\b\w/g,m=>m.toUpperCase());
+  let proposed_title=(subject+" Canvas Art"+(extras.length?" • "+extras.map(w=>w.replace(/\b\w/g,m=>m.toUpperCase())).join(" ")+" Wall Decor":"")).replace(/\s+/g," ").trim();
+  const tw=proposed_title.split(/\s+/); if(tw.length>15) proposed_title=tw.slice(0,15).join(" ");
+  proposed_title=proposed_title.slice(0,140).replace(/[ •,]+$/,"");
+  const candidates=uniq(["canvas wall art",...identity.flatMap(x=>[x.toLowerCase(),x.toLowerCase()+" canvas"]),...ranked,...(tags||[])]).map(x=>x.trim()).filter(x=>x.length>=3&&x.length<=20);
   const proposed_tags=candidates.slice(0,13);
-  const safeFallback=["canvas wall art","home wall decor","canvas artwork","living room art","gallery wall decor","interior wall art","decorative canvas","art gift"];
+  const safeFallback=["home wall decor","canvas artwork","living room art","gallery wall decor","interior wall art","decorative canvas","art gift"];
   for(const x of safeFallback){if(proposed_tags.length>=13)break;if(!proposed_tags.includes(x))proposed_tags.push(x)}
-  const intro=`Physical ${item.toLowerCase()} featuring ${descriptors.slice(0,3).join(", ")}. A clear, buyer-friendly statement piece for home interiors.`;
+  const intro=`Physical canvas wall art featuring ${(identity.slice(0,3).join(", ")||subject).toLowerCase()}. Made as a statement piece for home interiors.`;
   const original=String(description||"").trim();
   const proposed_description=original?intro+"\n\n"+original:intro;
-  return {proposed_title,proposed_tags:proposed_tags.slice(0,13),proposed_description,top_terms:uniq([...descriptors,...terms.slice(0,6)]),title_guidance:"Etsy 2026 clear-title guidance: item first, objective descriptors, under 15 words, no keyword stuffing"};
+  return {proposed_title,proposed_tags:proposed_tags.slice(0,13),proposed_description,top_terms:uniq([...identity.slice(0,4),...ranked.slice(0,6)]),title_guidance:"Etsy clear-title pattern learned from shop recommendations: subject + Canvas Art + one concise differentiator; preserve product identity; no keyword stuffing"};
 }
 async function etsyMarketSearch(keywords){
   const key=String(process.env.ETSY_API_KEY||"").trim(); if(!key)return [];
