@@ -40,18 +40,23 @@ export async function GET(request) {
 function words(v){return String(v||"").toLowerCase().replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(x=>x.length>2)}
 function uniq(a){return [...new Set(a)]}
 function proposalFromEvidence(title,tags,description,evidence){
-  const stop=new Set(["with","and","the","for","from","this","that","print","poster","digital","download"]);
-  const freq={}; for(const t of evidence){for(const w of words(t)){if(!stop.has(w))freq[w]=(freq[w]||0)+1}}
-  const top=Object.entries(freq).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+  const stop=new Set(["with","and","the","for","from","this","that","print","poster","digital","download","wall"]);
   const own=uniq([...words(title),...(tags||[]).flatMap(words)]);
-  const relevant=top.filter(w=>own.includes(w)||["canvas","wall","art","decor","home","gift","luxury","vintage","floral","abstract","painting"].includes(w));
-  const tagPool=uniq([...(tags||[]),...relevant,...own]).map(x=>x.slice(0,20)).filter(x=>x.length>2).slice(0,13);
-  while(tagPool.length<13)tagPool.push(["canvas wall art","home wall decor","canvas artwork","wall decoration","art gift","room decor","gallery wall","canvas print","interior decor","wall artwork","home decor art","living room art","decorative canvas"][tagPool.length]||("canvas art "+tagPool.length));
-  const phrases=uniq([...relevant.slice(0,7),...own.slice(0,7)]).map(x=>x.replace(/^./,m=>m.toUpperCase()));
-  let proposed=phrases.join(" ")+" Canvas Wall Art, "+tagPool.slice(0,3).join(", ");
-  proposed=proposed.replace(/\s+/g," ").slice(0,140).replace(/[ ,]+$/,"");
-  const desc=description||"";
-  return {proposed_title:proposed,proposed_tags:tagPool.slice(0,13),proposed_description:desc,top_terms:relevant.slice(0,12)};
+  const freq={}; const phraseFreq={};
+  for(const t of evidence){const ws=words(t).filter(w=>!stop.has(w));for(const w of ws)freq[w]=(freq[w]||0)+1;for(let i=0;i<ws.length-1;i++){const p=ws.slice(i,i+2).join(" ");phraseFreq[p]=(phraseFreq[p]||0)+1}}
+  const allowed=w=>own.includes(w)||["canvas","art","decor","home","gift","luxury","vintage","floral","abstract","painting","room","living","bedroom","gallery","modern","boho","minimalist"].includes(w);
+  const phrases=Object.entries(phraseFreq).filter(([p,n])=>n>=2&&p.split(" ").some(allowed)).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+  const terms=Object.entries(freq).filter(([w])=>allowed(w)).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+  const candidates=uniq([...phrases,...terms,...own.map(w=>w+" canvas"),...(tags||[])]).map(x=>x.trim()).filter(x=>x.length>=3&&x.length<=20);
+  const proposed_tags=candidates.slice(0,13);
+  const safeFallback=["canvas wall art","home wall decor","canvas artwork","living room art","gallery wall decor","interior wall art","decorative canvas","art gift"];
+  for(const x of safeFallback){if(proposed_tags.length>=13)break;if(!proposed_tags.includes(x))proposed_tags.push(x)}
+  const titleParts=uniq([...phrases.slice(0,5),...terms.slice(0,6),...own.slice(0,5)]).map(x=>x.replace(/\b\w/g,m=>m.toUpperCase()));
+  let proposed_title=(titleParts.join(" · ")+" · Canvas Wall Art").replace(/\s+/g," ").slice(0,140).replace(/[ ·,]+$/,"");
+  const intro=`Bring ${titleParts.slice(0,3).join(", ").toLowerCase()} into your space with this physical canvas wall art. Designed for stylish home, living room, bedroom or gallery-wall decor.`;
+  const original=String(description||"").trim();
+  const proposed_description=original?intro+"\n\n"+original:intro;
+  return {proposed_title,proposed_tags:proposed_tags.slice(0,13),proposed_description,top_terms:uniq([...phrases.slice(0,6),...terms.slice(0,6)])};
 }
 async function etsyMarketSearch(keywords){
   const key=String(process.env.ETSY_API_KEY||"").trim(); if(!key)return [];
