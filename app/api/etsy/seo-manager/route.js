@@ -40,7 +40,7 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   if (body.action === "prepare") {
     const listingId = String(body.listing_id || "").trim();
-    if (!/^\\d+$/.test(listingId)) return NextResponse.json({ error: "Geçersiz listing ID.", etsy_modified: false }, { status: 400 });
+    if (!/^\d+$/.test(listingId)) return NextResponse.json({ error: "Geçersiz listing ID.", etsy_modified: false }, { status: 400 });
     const { response, data } = await bridge(`/listings/${listingId}/prepare`, {
       method: "POST",
       body: JSON.stringify({
@@ -55,7 +55,7 @@ export async function POST(request) {
   }
   if (body.action === "publish") {
     const listingId = String(body.listing_id || "").trim();
-    if (!/^\\d+$/.test(listingId)) return NextResponse.json({ error: "Geçersiz listing ID.", etsy_modified: false }, { status: 400 });
+    if (!/^\d+$/.test(listingId)) return NextResponse.json({ error: "Geçersiz listing ID.", etsy_modified: false }, { status: 400 });
     const { response, data } = await bridge(`/listings/${listingId}/publish`, { method: "POST", body: JSON.stringify({ preview_token: body.preview_token, approval: body.approval }) });
     if (!response) return NextResponse.json(data, { status: 503 });
     return NextResponse.json(data, { status: response.status });
