@@ -1,35 +1,8 @@
-"use client";
-import { useState } from "react";
-
-export default function SeoManagerPanel() {
-  const [data,setData]=useState(null), [loading,setLoading]=useState(false), [error,setError]=useState("");
-  async function scan(){
-    setLoading(true); setError("");
-    try{
-      let offset=0, all=[], total=0, needs=0;
-      do{
-        const r=await fetch("/api/etsy/seo-manager",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"scan",limit:100,offset})});
-        const j=await r.json(); if(!r.ok) throw new Error(j.error||"SEO taraması başarısız.");
-        total=j.total_count||total; needs+=j.needs_review_count||0; all.push(...(j.results||[])); offset=j.next_offset;
-      }while(offset!==null && offset!==undefined);
-      setData({total_count:total,needs_review_count:needs,results:all});
-    }catch(e){setError(e.message||"SEO taraması başarısız.");}finally{setLoading(false);}
-  }
-  return <main style={{maxWidth:1050,margin:"32px auto",padding:"0 20px",fontFamily:"Arial,sans-serif"}}>
-    <a href="/" style={{fontSize:13}}>← VAELONS Manager</a>
-    <h1>VAELONS SEO Manager</h1>
-    <p style={{color:"#6b7280",lineHeight:1.6}}>Aktif Etsy listinglerini tarar. Bu aşama yalnız analiz ve önizlemedir; fiyat, başlık, tag veya açıklamayı değiştirmez.</p>
-    <button onClick={scan} disabled={loading} style={{padding:"12px 18px",border:0,borderRadius:10,background:"#111827",color:"#fff",fontWeight:700,cursor:"pointer"}}>{loading?"Etsy listingleri taranıyor…":"Tüm Aktif Listingleri Tara"}</button>
-    {error&&<div style={{marginTop:14,padding:12,background:"#fef2f2",color:"#991b1b",borderRadius:10}}>{error}</div>}
-    {data&&<><div style={{display:"flex",gap:10,flexWrap:"wrap",margin:"18px 0"}}>
-      <Metric label="Aktif listing" value={data.total_count}/><Metric label="SEO inceleme gerekli" value={data.needs_review_count}/>
-    </div>
-    <div style={{display:"grid",gap:10}}>{data.results.map(x=><div key={x.listing_id} style={{background:"#fff",border:"1px solid #e5e7eb",borderRadius:12,padding:14}}>
-      <div style={{fontSize:12,color:"#6b7280"}}>Listing {x.listing_id} · {x.structural_status==="needs_review"?"İnceleme gerekli":"Yapısal olarak uygun"}</div>
-      <div style={{fontWeight:800,marginTop:4}}>{x.exact_title}</div>
-      <div style={{fontSize:12,marginTop:8}}>Başlık: {x.title_length}/140 · Tag: {x.tag_count}/13</div>
-      {!!x.issues?.length&&<div style={{fontSize:12,color:"#9a3412",marginTop:6}}>{x.issues.join(" · ")}</div>}
-    </div>)}</div></>}
-  </main>;
-}
-function Metric({label,value}){return <div style={{background:"#fff",border:"1px solid #e5e7eb",borderRadius:12,padding:"12px 16px"}}><div style={{fontSize:12,color:"#6b7280"}}>{label}</div><div style={{fontSize:26,fontWeight:900}}>{value}</div></div>}
+"use client";import{useMemo,useState}from"react";
+function score(x){let s=100;const len=Number(x.title_length||0),tags=Number(x.tag_count||0);if(len<70)s-=18;if(len>140)s-=35;if(tags<13)s-=Math.min(30,(13-tags)*4);s-=Math.min(25,(x.issues||[]).length*7);return Math.max(0,Math.min(100,s));}
+function band(s){return s>=95?"Hedef":s>=85?"Güçlü":s>=70?"Geliştirmeli":"Müdahale";}
+export default function SeoManagerPanel(){const[data,setData]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState(""),[selected,setSelected]=useState({});
+async function scan(){setLoading(true);setError("");try{let offset=0,all=[],total=0;do{const r=await fetch("/api/etsy/seo-manager",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"scan",limit:100,offset})});const j=await r.json();if(!r.ok)throw new Error(j.error||"SEO taraması başarısız");total=j.total_count||total;all.push(...(j.results||[]));offset=j.next_offset;}while(offset!==null&&offset!==undefined);all=all.map(x=>({...x,search_opportunity_score:score(x)})).sort((a,b)=>a.search_opportunity_score-b.search_opportunity_score);setData({total_count:total,results:all});}catch(e){setError(e.message)}finally{setLoading(false)}}
+const rows=data?.results||[];const chosen=useMemo(()=>rows.filter(x=>selected[x.listing_id]),[rows,selected]);const toggleLow=()=>{const n={};rows.filter(x=>x.search_opportunity_score<85).forEach(x=>n[x.listing_id]=true);setSelected(n)};
+return <main style={{maxWidth:1120,margin:"32px auto",padding:"0 20px",fontFamily:"Arial"}}><h1>VAELONS SEO Opportunity Manager</h1><p style={{color:"#666"}}>Tüm aktif listingleri önce güvenli yapısal skorla tarar. Düşük skorlular canlı Etsy pazar araştırması için işaretlenir. Bu skor Etsy'nin resmi arama hacmi değildir.</p><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button style={btn} onClick={scan} disabled={loading}>{loading?"Taranıyor…":"Tüm Aktif Listingleri Tara"}</button>{data&&<button style={btn2} onClick={toggleLow}>85 Altını Seç</button>}</div>{error&&<p style={{color:"#991b1b"}}>{error}</p>}{data&&<><div style={{display:"flex",gap:10,margin:"16px 0",flexWrap:"wrap"}}><M t="Aktif" n={rows.length}/><M t="Müdahale <70" n={rows.filter(x=>x.search_opportunity_score<70).length}/><M t="Geliştirmeli 70–84" n={rows.filter(x=>x.search_opportunity_score>=70&&x.search_opportunity_score<85).length}/><M t="95–100" n={rows.filter(x=>x.search_opportunity_score>=95).length}/><M t="Seçili" n={chosen.length}/></div><div style={{display:"grid",gap:9}}>{rows.map(x=><label key={x.listing_id} style={card}><input type="checkbox" checked={!!selected[x.listing_id]} onChange={e=>setSelected({...selected,[x.listing_id]:e.target.checked})}/><div style={{flex:1}}><b>{x.exact_title}</b><div style={{fontSize:12,color:"#666"}}>Listing {x.listing_id} · Başlık {x.title_length}/140 · Tag {x.tag_count}/13</div>{x.issues?.length>0&&<div style={{fontSize:12,color:"#9a3412"}}>{x.issues.join(" · ")}</div>}</div><div style={{minWidth:90,textAlign:"right"}}><b style={{fontSize:22}}>{x.search_opportunity_score}/100</b><div style={{fontSize:11}}>{band(x.search_opportunity_score)}</div></div></label>)}</div></>}</main>}
+function M({t,n}){return <div style={{padding:12,background:"#fff",border:"1px solid #ddd",borderRadius:10}}><b style={{fontSize:24}}>{n}</b><div style={{fontSize:11}}>{t}</div></div>}const btn={padding:"12px 16px",border:0,borderRadius:9,background:"#111827",color:"#fff",fontWeight:800};const btn2={...btn,background:"#fff",color:"#111827",border:"1px solid #ccc"};const card={display:"flex",gap:12,alignItems:"center",background:"#fff",border:"1px solid #ddd",borderRadius:12,padding:12};
